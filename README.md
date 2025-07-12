@@ -37,7 +37,7 @@
 - 运行部署命令：
 
 ```bash
-git clone https://github.com/your-repo/one-balance.git && cd one-balance && pnpm install && \
+git clone https://github.com/glidea/one-balance.git && cd one-balance && pnpm install && \
 AUTH_KEY=your-super-secret-auth-key pnpm run deploycf
 ```
 
@@ -84,7 +84,7 @@ curl "https://<your-worker-url>/api/google-ai-studio/v1beta/models/gemini-2.5-pr
 P.S. 如果是 OpenAI 兼容格式
 
 ```bash
-curl "https://<your-worker-url>/api/compat" \
+curl "https://<your-worker-url>/api/compat/chat/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-super-secret-auth-key" \
   -d '{

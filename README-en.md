@@ -35,7 +35,7 @@ If you have multiple API keys with quota limits (e.g., Google AI Studio), `One B
 - Run the deployment command:
 
 ```bash
-git clone https://github.com/your-repo/one-balance.git && cd one-balance && pnpm install && \
+git clone https://github.com/glidea/one-balance.git && cd one-balance && pnpm install && \
 AUTH_KEY=your-super-secret-auth-key pnpm run deploycf
 ```
 
@@ -80,7 +80,7 @@ curl "https://<your-worker-url>/api/google/v1beta/models/gemini-1.5-pro-latest:g
 P.S. For OpenAI-compatible format
 
 ```bash
-curl "https://<your-worker-url>/api/compat" \
+curl "https://<your-worker-url>/api/compat/chat/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-super-secret-auth-key" \
   -d '{
