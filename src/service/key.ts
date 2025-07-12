@@ -28,6 +28,7 @@ export async function listActiveKeysViaCache(env: Env): Promise<schema.Key[]> {
         isDirty: false
     }
 
+    console.info(`cache refreshed: ${keys.length} keys`)
     return keys
 }
 
