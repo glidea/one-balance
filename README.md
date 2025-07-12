@@ -1,7 +1,8 @@
 [English](README-en.md)
 
 <p align="center">
-  <img src="banner.png" width="600">
+  <img src="banner.png">
+  <a href="https://deepwiki.com/glidea/one-balance"><img src="https://deepwiki.com/badge.svg"/></a>
 </p>
 
 `One Balance` 是一个基于 Cloudflare 的 API 密钥负载均衡器。它利用 Cloudflare AI Gateway 的路由能力，并在此基础上增加了对多个 API 密钥的轮询和健康检查功能。

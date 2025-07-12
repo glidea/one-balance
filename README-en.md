@@ -1,5 +1,6 @@
 <p align="center">
   <img src="banner.png">
+  <a href="https://deepwiki.com/glidea/one-balance"><img src="https://deepwiki.com/badge.svg"/></a>
 </p>
 
 `One Balance` is an API key load balancer built on Cloudflare. It leverages the routing capabilities of Cloudflare AI Gateway and adds features for round-robin rotation and health checks for multiple API keys.
