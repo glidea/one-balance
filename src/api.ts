@@ -90,7 +90,7 @@ async function forward(
     provider: string,
     model: string
 ) {
-    const activeKeys = await keyService.listActiveKeysViaCache(env)
+    const activeKeys = await keyService.listActiveKeysViaCache(env, provider)
     if (activeKeys.length === 0) {
         return new Response('No active keys available', { status: 503 })
     }
@@ -126,7 +126,7 @@ async function forward(
                 console.error(
                     `key ${selectedKey.key} is blocked due to ${respFromGateway.status} ${await respFromGateway.text()}`
                 )
-                ctx.waitUntil(keyService.setKeyStatus(env, selectedKey.id, 'blocked'))
+                ctx.waitUntil(keyService.setKeyStatus(env, provider, selectedKey.id, 'blocked'))
 
                 // next key
                 activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
@@ -136,7 +136,7 @@ async function forward(
             case 429:
                 console.warn(`key ${selectedKey.key} is cooling down for model ${model} due to 429`)
                 const cooldownSeconds = await analyze429CooldownSeconds(respFromGateway, provider)
-                ctx.waitUntil(keyService.setKeyModelCooldown(env, selectedKey.id, model, cooldownSeconds))
+                ctx.waitUntil(keyService.setKeyModelCooldown(env, selectedKey.id, provider, model, cooldownSeconds))
 
                 // next key
                 activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
@@ -144,6 +144,9 @@ async function forward(
         }
 
         // 200 or user, gateway, provider error
+        if (status / 100 !== 2) {
+            console.error(`gateway returned ${status}`)
+        }
         return respFromGateway
     }
 

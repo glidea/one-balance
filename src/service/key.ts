@@ -8,39 +8,49 @@ interface Cache<T> {
     isDirty: boolean
 }
 
-let activeKeysCache: Cache<schema.Key[]> | null = null // only shared within a worker instance (shutdown if idle)
+// only shared within a worker instance (shutdown if idle)
+let activeKeysCacheByProvider: Map<string, Cache<schema.Key[]>> = new Map()
 let cacheMaxAgeSeconds = 1
 
-export async function listActiveKeysViaCache(env: Env): Promise<schema.Key[]> {
+export async function listActiveKeysViaCache(env: Env, provider: string): Promise<schema.Key[]> {
     const now = Date.now() / 1000
-    if (activeKeysCache && now - activeKeysCache.updatedAt < cacheMaxAgeSeconds && !activeKeysCache.isDirty) {
-        return activeKeysCache.data
+    const cache = activeKeysCacheByProvider.get(provider)
+
+    if (cache && now - cache.updatedAt < cacheMaxAgeSeconds && !cache.isDirty) {
+        return cache.data
     }
 
     // may thundering herd, but it should be enough
     const keys = await d1.db(env).query.keys.findMany({
-        where: drizzle.eq(schema.keys.status, 'active')
+        where: drizzle.and(drizzle.eq(schema.keys.status, 'active'), drizzle.eq(schema.keys.provider, provider))
     })
 
-    activeKeysCache = {
+    activeKeysCacheByProvider.set(provider, {
         data: keys,
         updatedAt: now,
         isDirty: false
-    }
+    })
 
-    console.info(`cache refreshed: ${keys.length} keys`)
+    console.info(`cache refreshed for ${provider}: ${keys.length} keys`)
     return keys
 }
 
-export async function setKeyStatus(env: Env, keyId: string, status: string) {
+export async function setKeyStatus(env: Env, provider: string, keyId: string, status: string) {
     await d1.db(env).update(schema.keys).set({ status }).where(drizzle.eq(schema.keys.id, keyId))
 
-    if (activeKeysCache) {
-        activeKeysCache.isDirty = true
+    const cache = activeKeysCacheByProvider.get(provider)
+    if (cache) {
+        cache.isDirty = true
     }
 }
 
-export async function setKeyModelCooldown(env: Env, keyId: string, model: string, cooldownSecondsIfActive: number) {
+export async function setKeyModelCooldown(
+    env: Env,
+    keyId: string,
+    provider: string,
+    model: string,
+    cooldownSecondsIfActive: number
+) {
     const now = Date.now() / 1000
     const newCooldownEndAt = Math.round(now + cooldownSecondsIfActive)
 
@@ -76,8 +86,11 @@ export async function setKeyModelCooldown(env: Env, keyId: string, model: string
         )
         .returning({ updatedId: schema.keys.id })
 
-    if (activeKeysCache && result.length > 0) {
-        activeKeysCache.isDirty = true
+    if (result.length > 0) {
+        const cache = activeKeysCacheByProvider.get(provider)
+        if (cache) {
+            cache.isDirty = true
+        }
     }
 }
 
