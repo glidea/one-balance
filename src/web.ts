@@ -986,7 +986,7 @@ function buildModalScript(): string {
                     } else {
                         const rows = Object.entries(modelCoolings).map(([model, cooling]) => {
                             const isAvailable = cooling.end_at < now;
-                            const remainingTime = isAvailable ? formatTime(cooling.end_at - now) : '-';
+                            const remainingTime = isAvailable ? '-' : formatTime(cooling.end_at - now);
                             const totalTime = formatTime(cooling.total_seconds);
                             const statusClass = isAvailable ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50';
                             const status = isAvailable ? 'available' : 'cooling';
