@@ -3,10 +3,11 @@
     "version": "0.0.0",
     "license": "MIT",
     "scripts": {
-        "deploycf": "cp wrangler.jsonc.tpl wrangler.jsonc && node pre-deploy.mjs && wrangler types && pnpm prettier --write . && pnpm migrate:remote && wrangler deploy",
-        "dev": "cp wrangler.jsonc.tpl wrangler.jsonc && wrangler types && pnpm prettier --write . && pnpm migrate && wrangler dev --port 8080",
+        "deploycf": "pnpm init:config && node pre-deploy.mjs && wrangler types && pnpm prettier --write . && pnpm migrate:remote && wrangler deploy",
+        "dev": "pnpm init:config && wrangler types && pnpm prettier --write . && pnpm migrate && wrangler dev --port 8080",
         "migrate:remote": "drizzle-kit generate && wrangler d1 migrations apply one-balance --remote",
-        "migrate": "drizzle-kit generate && wrangler d1 migrations apply one-balance --local"
+        "migrate": "drizzle-kit generate && wrangler d1 migrations apply one-balance --local",
+        "init:config": "node -e \"require('fs').copyFileSync('wrangler.jsonc.tpl', 'wrangler.jsonc')\""
     },
     "packageManager": "pnpm@10.12.2+sha512.a32540185b964ee30bb4e979e405adc6af59226b438ee4cc19f9e8773667a66d302f5bfee60a39d3cac69e35e4b96e708a71dd002b7e9359c4112a1722ac323f",
     "devDependencies": {

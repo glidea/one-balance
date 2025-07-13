@@ -37,7 +37,8 @@
 - 运行部署命令：
 
 ```bash
-git clone https://github.com/glidea/one-balance.git && cd one-balance && pnpm install && \
+git clone https://github.com/glidea/one-balance.git && cd one-balance && pnpm install
+
 AUTH_KEY=your-super-secret-auth-key pnpm run deploycf
 ```
 
