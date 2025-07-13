@@ -985,11 +985,11 @@ function buildModalScript(): string {
                         modalTable.innerHTML = '<p class="text-gray-600 text-center py-8">No model cooling data available</p>';
                     } else {
                         const rows = Object.entries(modelCoolings).map(([model, cooling]) => {
-                            const isActive = cooling.end_at < now;
-                            const remainingTime = isActive ? formatTime(cooling.end_at - now) : '-';
+                            const isAvailable = cooling.end_at < now;
+                            const remainingTime = isAvailable ? formatTime(cooling.end_at - now) : '-';
                             const totalTime = formatTime(cooling.total_seconds);
-                            const statusClass = isActive ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50';
-                            const status = isActive ? 'active' : 'cooling';
+                            const statusClass = isAvailable ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50';
+                            const status = isAvailable ? 'available' : 'cooling';
                             
                             return \`
                                 <tr class="border-b border-gray-200">

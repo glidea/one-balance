@@ -44,15 +44,15 @@ export async function setKeyStatus(env: Env, provider: string, keyId: string, st
     }
 }
 
-export async function setKeyModelCooldown(
+export async function setKeyModelCooldownIfAvailable(
     env: Env,
     keyId: string,
     provider: string,
     model: string,
-    cooldownSecondsIfActive: number
+    sec: number
 ) {
     const now = Date.now() / 1000
-    const newCooldownEndAt = Math.round(now + cooldownSecondsIfActive)
+    const newCooldownEndAt = Math.round(now + sec)
 
     const modelKey = model.replace(/"/g, '""')
     const modelPath = `$.\"${modelKey}\"`
@@ -70,16 +70,18 @@ export async function setKeyModelCooldown(
                     'end_at',
                     ${newCooldownEndAt},
                     'total_seconds',
-                    COALESCE(CAST(json_extract(${schema.keys.modelCoolings}, ${totalSecondsPath}) AS INTEGER), 0) + ${cooldownSecondsIfActive}
+                    COALESCE(CAST(json_extract(${schema.keys.modelCoolings}, ${totalSecondsPath}) AS INTEGER), 0) + ${sec}
                 )
             )`,
-            totalCoolingSeconds: drizzle.sql`${schema.keys.totalCoolingSeconds} + ${cooldownSecondsIfActive}`
+            totalCoolingSeconds: drizzle.sql`${schema.keys.totalCoolingSeconds} + ${sec}`
         })
         .where(
             drizzle.and(
                 drizzle.eq(schema.keys.id, keyId),
                 drizzle.or(
                     drizzle.sql`json_extract(${schema.keys.modelCoolings}, ${endAtPath}) IS NULL`,
+                    // if key is already cooling down, do nothing,
+                    // otherwise may wrong extend the recovery time (cache consistency may cause multiple calls)
                     drizzle.sql`json_extract(${schema.keys.modelCoolings}, ${endAtPath}) <= ${now}`
                 )
             )

@@ -123,22 +123,24 @@ async function forward(
             // key is invalid, then continue to block and next key
             case 401:
             case 403:
-                console.error(
-                    `key ${selectedKey.key} is blocked due to ${respFromGateway.status} ${await respFromGateway.text()}`
-                )
                 ctx.waitUntil(keyService.setKeyStatus(env, provider, selectedKey.id, 'blocked'))
 
                 // next key
+                console.error(
+                    `key ${selectedKey.key} is blocked due to ${respFromGateway.status} ${await respFromGateway.text()}`
+                )
                 activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
                 continue
 
             // try cooling down
             case 429:
-                console.warn(`key ${selectedKey.key} is cooling down for model ${model} due to 429`)
-                const cooldownSeconds = await analyze429CooldownSeconds(respFromGateway, provider)
-                ctx.waitUntil(keyService.setKeyModelCooldown(env, selectedKey.id, provider, model, cooldownSeconds))
+                const sec = await analyze429CooldownSeconds(respFromGateway, provider)
+                ctx.waitUntil(keyService.setKeyModelCooldownIfAvailable(env, selectedKey.id, provider, model, sec))
 
                 // next key
+                console.warn(
+                    `key ${selectedKey.key} is cooling down for model ${model} due to 429 ${await respFromGateway.text()}`
+                )
                 activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
                 continue
         }
@@ -283,7 +285,12 @@ async function analyze429CooldownSeconds(respFromGateway: Response, provider: st
 }
 
 function getGoogleAiStudioErrorDetail(body: any, type: string): any | null {
-    const details = body.error?.details || []
+    let errorBody = body
+    if (Array.isArray(body) && body.length > 0) {
+        errorBody = body[0]
+    }
+
+    const details = errorBody.error?.details || []
     for (const detail of details) {
         if (detail['@type'] === type) {
             return detail
