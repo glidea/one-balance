@@ -66,22 +66,7 @@ AUTH_KEY=your-super-secret-auth-key pnpm run deploycf
 
 ### 示例 (使用 `curl`)
 
-#### 请求 Google Gemini
-
-```bash
-curl "https://<your-worker-url>/api/google-ai-studio/v1beta/models/gemini-2.5-pro:generateContent" \
-  -H "Content-Type: application/json" \
-  -H "x-goog-api-key: your-super-secret-auth-key" \
-  -d '{
-    "contents": [{
-      "parts":[{
-        "text": "Write a story about a magic backpack."
-      }]
-    }]
-  }'
-```
-
-P.S. 如果是 OpenAI 兼容格式
+#### 使用 OpenAI 兼容格式请求 Google Gemini
 
 ```bash
 curl "https://<your-worker-url>/api/compat/chat/completions" \

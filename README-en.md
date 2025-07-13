@@ -62,22 +62,7 @@ The `AUTH_KEY` set during deployment needs to be sent via the corresponding prov
 
 ### Examples (using `curl`)
 
-#### Requesting Google Gemini
-
-```bash
-curl "https://<your-worker-url>/api/google/v1beta/models/gemini-1.5-pro-latest:generateContent" \
-  -H "Content-Type: application/json" \
-  -H "x-goog-api-key: your-super-secret-auth-key" \
-  -d '{
-    "contents": [{
-      "parts":[{
-        "text": "Write a story about a magic backpack."
-      }]
-    }]
-  }'
-```
-
-P.S. For OpenAI-compatible format
+#### Requesting Google Gemini (OpenAI-compatible format)
 
 ```bash
 curl "https://<your-worker-url>/api/compat/chat/completions" \
