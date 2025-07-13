@@ -49,7 +49,26 @@ async function main() {
 
     console.log('Checking for D1 databases...')
     const d1DatabasesOutput = getOutput('wrangler d1 list --json')
-    const existingDatabases = JSON.parse(d1DatabasesOutput)
+
+    // 处理包含非JSON内容的输出，提取首个有效JSON（数组）片段
+    function extractValidJson(output) {
+        // 捕获第一个 '[' 开始，到与之匹配的 ']' 结束的部分
+        const arrMatch = output.match(/\[[\s\S]*?\]/)
+        if (arrMatch) {
+            try {
+                return JSON.parse(arrMatch[0])
+            } catch {}
+        }
+        // 捕获第一个 '{' 开始，到与之匹配的 '}' 结束的部分
+        const objMatch = output.match(/\{[\s\S]*\}/)
+        if (objMatch) {
+            try {
+                return JSON.parse(objMatch[0])
+            } catch {}
+        }
+        throw new Error('未能从 wrangler d1 list 输出中提取有效 JSON')
+    }
+    const existingDatabases = extractValidJson(d1DatabasesOutput)
     const existingDatabaseNames = new Set(existingDatabases.map(db => db.name))
 
     for (const db of config.d1_databases) {
@@ -63,7 +82,7 @@ async function main() {
 
     console.log('Refreshing D1 database list to sync IDs...')
     const finalD1ListRaw = getOutput('wrangler d1 list --json')
-    const finalD1List = JSON.parse(finalD1ListRaw)
+    const finalD1List = extractValidJson(finalD1ListRaw)
     const dbNameToId = new Map(finalD1List.map(db => [db.name, db.uuid]))
 
     for (const dbConfig of config.d1_databases) {
