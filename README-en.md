@@ -35,8 +35,18 @@ If you have multiple API keys with quota limits (e.g., Google AI Studio), `One B
 - Run the deployment command:
 
 ```bash
-git clone https://github.com/glidea/one-balance.git && cd one-balance && pnpm install && \
+git clone https://github.com/glidea/one-balance.git && cd one-balance && pnpm install
+
+# Mac/Linux
+git clone https://github.com/glidea/one-balance.git
+cd one-balance
+pnpm install
+
+# Mac/Linux
 AUTH_KEY=your-super-secret-auth-key pnpm run deploycf
+
+# Windows (PowerShell)
+$env:AUTH_KEY = "your-super-secret-auth-key"; pnpm run deploycf
 ```
 
 - The script will guide you to log in to `wrangler` (if you haven't already), automatically create the required D1 database, and deploy the Worker. Upon successful deployment, you will get a Worker URL, for example, `https://one-balance.<your-subdomain>.workers.dev`.

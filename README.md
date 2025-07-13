@@ -37,9 +37,15 @@
 - 运行部署命令：
 
 ```bash
-git clone https://github.com/glidea/one-balance.git && cd one-balance && pnpm install
+git clone https://github.com/glidea/one-balance.git
+cd one-balance
+pnpm install
 
+# Mac/Linux
 AUTH_KEY=your-super-secret-auth-key pnpm run deploycf
+
+# Windows (PowerShell)
+$env:AUTH_KEY = "your-super-secret-auth-key"; pnpm run deploycf
 ```
 
 - 脚本将引导你登录 `wrangler` (如果尚未登录)，自动创建所需的 D1 数据库，并部署 Worker。部署成功后，会得到一个 Worker 的 URL，例如 `https://one-balance-backend.<your-subdomain>.workers.dev`。
