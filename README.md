@@ -7,7 +7,7 @@
 
 `One Balance` 是一个基于 Cloudflare 的 API 密钥负载均衡器。它利用 Cloudflare AI Gateway 的路由能力，并在此基础上增加了对多个 API 密钥的轮询和健康检查功能。
 
-如果你有多个具有配额限制的 API 密钥（例如 Google AI Studio），`One Balance` 可以**智能**轮询使用这些密钥，从而最大化利用可用资源。(赞助项目可以领取 Key，见底部)
+如果你有多个具有配额限制的 API 密钥（例如 Google AI Studio），`One Balance` 可以**智能**轮询使用这些密钥，从而最大化利用可用资源。(**赞助项目可以领取 Key，见底部**)
 
 ## 特性
 
