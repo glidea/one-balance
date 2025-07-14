@@ -73,11 +73,12 @@ $env:AUTH_KEY = "your-super-secret-auth-key"; pnpm run deploycf
 #### 使用 OpenAI 兼容格式请求 Google Gemini
 
 ```bash
+# 支持以 OpenAI 格式访问任意 Provider
 curl "https://<your-worker-url>/api/compat/chat/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-super-secret-auth-key" \
   -d '{
-    "model": "google-ai-studio/gemini-2.5-pro",
+    "model": "google-ai-studio/gemini-2.5-pro", # 格式为 $provider/$model 参考 https://developers.cloudflare.com/ai-gateway/chat-completion/
     "messages": [
       {
         "role": "user",
@@ -104,11 +105,11 @@ curl https://<your-worker-url>/api/openai/v1/chat/completions \
   }'
 ```
 
+其它 Provider 格式参考 https://developers.cloudflare.com/ai-gateway/providers
+
 #### Cherry Studio
 
 ![](cherry-studio.png)
-
-更多请参考 https://developers.cloudflare.com/ai-gateway/providers
 
 ## How it work
 
