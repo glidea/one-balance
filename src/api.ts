@@ -10,7 +10,8 @@ const PROVIDER_CUSTOM_AUTH_HEADER: Record<string, string> = {
 }
 
 export async function handle(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const restResource = new URL(request.url).pathname.substring('/api/'.length)
+    const url = new URL(request.url)
+    const restResource = url.pathname.substring('/api/'.length) + url.search
 
     const provider = restResource.split('/')[0]
     const authKey = getAuthKey(request, provider)
