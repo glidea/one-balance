@@ -31,10 +31,7 @@
 - 导航到 `AI` -> `AI Gateway`。
 - 创建一个新的 AI Gateway，并将其命名为 **`one-balance`**。
 
-#### 2. 一键部署！
-
-- 设置 `AUTH_KEY` 作为访问此服务的密码。这个密钥应该足够复杂和安全。
-- 运行部署命令：
+#### 2. 部署到 Cloudflare
 
 ```bash
 git clone https://github.com/glidea/one-balance.git
@@ -54,7 +51,7 @@ $env:AUTH_KEY = "your-super-secret-auth-key"; pnpm run deploycf
 
 ### 1. 配置待轮询 KEYS
 
-访问 `https://<your-worker-url>`
+访问 `https://<your-worker-url>`（大陆不一定能访问，最好自备魔法）
 
 > 最佳实践：🙅🏻‍♀️尽量避免和他人共享 Key，这样系统无法感知全局的调用信息，可能会增加 429 概率
 
@@ -106,6 +103,10 @@ curl https://<your-worker-url>/api/openai/v1/chat/completions \
     ]
   }'
 ```
+
+#### Cherry Studio
+
+![](cherry-studio.png)
 
 更多请参考 https://developers.cloudflare.com/ai-gateway/providers
 
