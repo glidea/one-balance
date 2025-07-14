@@ -6,9 +6,24 @@ function run(command, options = {}) {
     execSync(command, { stdio: 'inherit', ...options })
 }
 
-function getOutput(command, options = {}) {
+function exec(command, options = {}) {
     console.log(`> ${command}`)
     return execSync(command, { encoding: 'utf-8', ...options })
+}
+
+function extractValidJson(output) {
+    const arrMatch = output.match(/\[[\s\S]*?\]/)
+    if (arrMatch) {
+        return JSON.parse(arrMatch[0])
+    }
+    const objMatch = output.match(/\{[\s\S]*\}/)
+    if (objMatch) {
+        return JSON.parse(objMatch[0])
+    }
+}
+
+function json(command, options = {}) {
+    return extractValidJson(exec(command, options))
 }
 
 function commandExists(command) {
@@ -48,31 +63,11 @@ async function main() {
     // TODO: auto create ai gateway when wrangler supports it
 
     console.log('Checking for D1 databases...')
-    const d1DatabasesOutput = getOutput('wrangler d1 list --json')
-
-    // 处理包含非JSON内容的输出，提取首个有效JSON（数组）片段
-    function extractValidJson(output) {
-        // 捕获第一个 '[' 开始，到与之匹配的 ']' 结束的部分
-        const arrMatch = output.match(/\[[\s\S]*?\]/)
-        if (arrMatch) {
-            try {
-                return JSON.parse(arrMatch[0])
-            } catch {}
-        }
-        // 捕获第一个 '{' 开始，到与之匹配的 '}' 结束的部分
-        const objMatch = output.match(/\{[\s\S]*\}/)
-        if (objMatch) {
-            try {
-                return JSON.parse(objMatch[0])
-            } catch {}
-        }
-        throw new Error('未能从 wrangler d1 list 输出中提取有效 JSON')
-    }
-    const existingDatabases = extractValidJson(d1DatabasesOutput)
-    const existingDatabaseNames = new Set(existingDatabases.map(db => db.name))
+    let dbs = json('wrangler d1 list --json')
+    const existingDBNames = new Set(dbs.map(db => db.name))
 
     for (const db of config.d1_databases) {
-        if (!existingDatabaseNames.has(db.database_name)) {
+        if (!existingDBNames.has(db.database_name)) {
             console.log(`Creating D1 database '${db.database_name}'...`)
             run(`wrangler d1 create ${db.database_name}`)
         } else {
@@ -81,9 +76,8 @@ async function main() {
     }
 
     console.log('Refreshing D1 database list to sync IDs...')
-    const finalD1ListRaw = getOutput('wrangler d1 list --json')
-    const finalD1List = extractValidJson(finalD1ListRaw)
-    const dbNameToId = new Map(finalD1List.map(db => [db.name, db.uuid]))
+    dbs = json('wrangler d1 list --json')
+    const dbNameToId = new Map(dbs.map(db => [db.name, db.uuid]))
 
     for (const dbConfig of config.d1_databases) {
         const dbId = dbNameToId.get(dbConfig.database_name)
