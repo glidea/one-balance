@@ -7,7 +7,14 @@
 
 `One Balance` 是一个基于 Cloudflare 的 API 密钥负载均衡器。它利用 Cloudflare AI Gateway 的路由能力，并在此基础上增加了对多个 API 密钥的轮询和健康检查功能。
 
-如果你有多个具有配额限制的 API 密钥（例如 Google AI Studio），`One Balance` 可以**智能**轮询使用这些密钥，从而最大化利用可用资源。(**赞助项目可以领取 Key，见底部**)
+如果你有多个具有配额限制的 API 密钥（例如 Google AI Studio），`One Balance` 可以**智能**轮询使用这些密钥，从而最大化利用可用资源。
+
+**赞助项目可以领取 Gemini Key**
+
+<a href="https://afdian.com/a/glidea"><img src="sponsor.png" width="500"></a>
+<br/>
+<a href="https://afdian.com/a/glidea">赞助项目，支持发展</a>
+
 
 ## 特性
 
@@ -194,9 +201,3 @@ graph TD
 1.  **核心事件日志**：系统会通过 `console.log` 输出关键事件，例如密钥被封禁、模型进入冷却期等。你可以在 Cloudflare 仪表盘查看这些日志来诊断问题。
 2.  **Cloudflare AI Gateway 分析**：AI Gateway 自带强大的分析面板，你可以清晰地看到请求数、错误率、延迟、成本等核心指标。
 3.  **管理界面**：系统提供了一个 UI 界面，可以直观地查看所有密钥的当前状态（active, blocked）和冷却详情。
-
-## 赞助项目
-
-<a href="https://afdian.com/a/glidea"><img src="sponsor.png" width="500"></a>
-<br/>
-<a href="https://afdian.com/a/glidea">赞助项目，支持发展</a>
