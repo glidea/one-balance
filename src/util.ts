@@ -3,6 +3,9 @@ export function isValidAuthKey(toCheck: string, authKeysStr: string): boolean {
         return false
     }
 
-    const keys = authKeysStr.split(',').map(key => key.trim()).filter(key => key.length > 0)
+    const keys = authKeysStr
+        .split(',')
+        .map(key => key.trim())
+        .filter(key => key.length > 0)
     return keys.includes(toCheck)
 }
