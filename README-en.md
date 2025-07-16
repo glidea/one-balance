@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="banner.png">
+  <img src="images/banner.png">
   <a href="https://deepwiki.com/glidea/one-balance"><img src="https://deepwiki.com/badge.svg"/></a>
 </p>
 

@@ -1,7 +1,7 @@
 [English](README-en.md)
 
 <p align="center">
-  <img src="banner.png">
+  <img src="images/banner.png">
   <a href="https://deepwiki.com/glidea/one-balance"><img src="https://deepwiki.com/badge.svg"/></a>
 </p>
 
@@ -11,10 +11,9 @@
 
 **赞助项目可以领取 Gemini Key**
 
-<a href="https://afdian.com/a/glidea"><img src="sponsor.png" width="500"></a>
+<a href="https://afdian.com/a/glidea"><img src="images/sponsor.png" width="500"></a>
 <br/>
 <a href="https://afdian.com/a/glidea">赞助项目，支持发展</a>
-
 
 ## 特性
 
@@ -116,7 +115,14 @@ curl https://<your-worker-url>/api/openai/v1/chat/completions \
 
 #### Cherry Studio
 
-![](cherry-studio.png)
+![](images/cherry-studio.png)
+
+## Roadmap
+
+[ ] 支持 key 动态转发
+[ ] 支持自定义渠道
+[ ] 支持虚拟 Model，聚合多个渠道
+[ ] 支持分发用户 Key
 
 ## How it work
 
