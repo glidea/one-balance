@@ -1,4 +1,5 @@
 import * as keyService from './service/key'
+import * as util from './util'
 import type * as schema from './service/d1/schema'
 
 const PROVIDER_CUSTOM_AUTH_HEADER: Record<string, string> = {
@@ -15,7 +16,7 @@ export async function handle(request: Request, env: Env, ctx: ExecutionContext):
 
     const provider = restResource.split('/')[0]
     const authKey = getAuthKey(request, provider)
-    if (!authKey || authKey !== env.AUTH_KEY) {
+    if (!util.isValidAuthKey(authKey, env.AUTH_KEY)) {
         return new Response('Invalid auth key', { status: 403 })
     }
 
