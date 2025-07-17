@@ -10,7 +10,7 @@ interface Cache<T> {
 
 // only shared within a worker instance (shutdown if idle)
 let activeKeysCacheByProvider: Map<string, Cache<schema.Key[]>> = new Map()
-let cacheMaxAgeSeconds = 1
+let cacheMaxAgeSeconds = 30
 
 export async function listActiveKeysViaCache(env: Env, provider: string): Promise<schema.Key[]> {
     const now = Date.now() / 1000
