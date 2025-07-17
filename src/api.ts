@@ -91,7 +91,7 @@ async function forward(
     restResource: string,
     provider: string,
     model: string
-) {
+): Promise<Response> {
     const activeKeys = await keyService.listActiveKeysViaCache(env, provider)
     if (activeKeys.length === 0) {
         return new Response('No active keys available', { status: 503 })
