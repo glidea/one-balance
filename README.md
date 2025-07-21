@@ -76,7 +76,25 @@ $env:AUTH_KEY = "your-super-secret-auth-key"; pnpm run deploycf
 
 ### 示例 (使用 `curl`)
 
-#### 使用 OpenAI 兼容格式请求 Google Gemini
+#### 直接使用 Gemini 格式请求 Google Gemini（支持流式）
+
+```bash
+curl "https://<your-worker-url>/api/google-ai-studio/v1/models/gemini-2.5-flash:streamGenerateContent?alt=sse" \
+ -H 'content-type: application/json' \
+ -H 'x-goog-api-key: your-super-secret-auth-key' \
+ -d '{
+      "contents": [
+          {
+            "role":"user",
+            "parts": [
+              {"text":"你是谁?"}
+            ]
+          }
+        ]
+      }'
+```
+
+#### 使用 OpenAI 兼容格式请求 Google Gemini (不支持流式，中文会乱码)
 
 ```bash
 # 支持以 OpenAI 格式访问任意 Provider
@@ -120,8 +138,11 @@ curl https://<your-worker-url>/api/openai/v1/chat/completions \
 ## Roadmap
 
 [ ] 支持 key 动态转发
+
 [ ] 支持自定义渠道
+
 [ ] 支持虚拟 Model，聚合多个渠道
+
 [ ] 支持分发用户 Key
 
 ## How it work
