@@ -131,7 +131,9 @@ async function forward(
                 console.error(
                     `key ${selectedKey.key} is blocked due to ${respFromGateway.status} ${await respFromGateway.text()}`
                 )
-                activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
+                if (activeKeys.length > 1000) { // save the CPU time for Cloudflare Free plan
+                    activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
+                }
                 continue
 
             // try cooling down
@@ -143,7 +145,9 @@ async function forward(
                 console.warn(
                     `key ${selectedKey.key} is cooling down for model ${model} due to 429 ${await respFromGateway.text()}`
                 )
-                activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
+                if (activeKeys.length > 1000) {
+                    activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
+                }
                 continue
 
             case 503:
@@ -179,10 +183,17 @@ function getAuthKey(request: Request, provider: string): string {
 }
 
 async function selectKey(keys: schema.Key[], model: string): Promise<schema.Key> {
+    let selectedKey = tryRandomSelect(keys, model) // fast path
+    if (selectedKey) {
+        return selectedKey
+    }
+
+    return selectFromAllKeys(keys, model)
+}
+
+function tryRandomSelect(keys: schema.Key[], model: string): schema.Key | null {
     const now = Date.now() / 1000
     const maxAttempts = 10
-    let bestCoolingKey: schema.Key | null = null
-    let earliestCooldownEnd = Infinity
 
     for (let i = 0; i < maxAttempts; i++) {
         const randomKey = keys[Math.floor(Math.random() * keys.length)]
@@ -192,15 +203,35 @@ async function selectKey(keys: schema.Key[], model: string): Promise<schema.Key>
             console.info(`selected a key ${randomKey.key} to try; count: ${i + 1}`)
             return randomKey
         }
+    }
 
-        if (coolingEnd < earliestCooldownEnd) {
+    return null
+}
+
+function selectFromAllKeys(keys: schema.Key[], model: string): schema.Key {
+    const now = Date.now() / 1000
+    const availableKeys = []
+    let bestCoolingKey: schema.Key | null = null
+    let earliestCooldownEnd = Infinity
+
+    for (const key of keys) {
+        const coolingEnd = key.modelCoolings?.[model]?.end_at
+        if (!coolingEnd || coolingEnd < now) {
+            availableKeys.push(key)
+        } else if (coolingEnd < earliestCooldownEnd) {
             earliestCooldownEnd = coolingEnd
-            bestCoolingKey = randomKey
+            bestCoolingKey = key
         }
     }
 
+    if (availableKeys.length > 0) {
+        const selectedKey = availableKeys[Math.floor(Math.random() * availableKeys.length)]
+        console.info(`selected available key ${selectedKey.key} after full scan`)
+        return selectedKey
+    }
+
     console.warn(`selected a cooling key ${bestCoolingKey?.key} to try`)
-    return bestCoolingKey!
+    return bestCoolingKey! // may be available actually
 }
 
 async function makeGatewayRequest(
