@@ -93,19 +93,24 @@ async function forward(
     provider: string,
     model: string
 ): Promise<Response> {
-    const activeKeys = await keyService.listActiveKeysViaCache(env, provider)
-    if (activeKeys.length === 0) {
-        return new Response('No active keys available', { status: 503 })
+    let availableKeys = await keyService.listAvailableKeysViaCache(env, provider, model)
+    if (availableKeys.length === 0) {
+        // There are no keys available right now.
+        // This could be because they are all cooling down for this specific model.
+        // We will not wait for the cooldown to end, but return 503 immediately.
+        // This is a trade-off for performance, avoiding holding the connection open.
+        // The client can retry after a short period.
+        return new Response(`No available keys for model ${model}`, { status: 503 })
     }
 
     const body = request.body ? await request.arrayBuffer() : null
     const MAX_RETRIES = 10
     for (let i = 0; i < MAX_RETRIES; i++) {
-        if (activeKeys.length === 0) {
-            return new Response('No active keys available', { status: 503 })
+        if (availableKeys.length === 0) {
+            return new Response(`No available keys for model ${model} after retries`, { status: 503 })
         }
 
-        const selectedKey = await selectKey(activeKeys, model)
+        const selectedKey = selectKey(availableKeys)
         const reqToGateway = await makeGatewayRequest(
             request.method,
             request.headers,
@@ -128,7 +133,7 @@ async function forward(
             case 'invalid_api_key':
             case 'permission_denied':
                 ctx.waitUntil(keyService.setKeyStatus(env, provider, selectedKey.id, 'blocked'))
-                activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
+                availableKeys.splice(availableKeys.indexOf(selectedKey), 1)
                 console.error(`Key ${selectedKey.key} blocked due to: ${unifiedError.code}`)
                 continue // Retry with the next key
 
@@ -138,7 +143,7 @@ async function forward(
                 ctx.waitUntil(
                     keyService.setKeyModelCooldownIfAvailable(env, selectedKey.id, provider, model, cooldownSeconds)
                 )
-                activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
+                availableKeys.splice(availableKeys.indexOf(selectedKey), 1)
                 console.warn(
                     `Key ${selectedKey.key} cooling down for model ${model} for ${cooldownSeconds}s due to rate limit.`
                 )
@@ -148,7 +153,7 @@ async function forward(
             case 'service_unavailable':
             case 'internal_server_error':
                 // These are potentially temporary, so we can retry with a different key.
-                activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
+                availableKeys.splice(availableKeys.indexOf(selectedKey), 1)
                 console.warn(`Retrying due to temporary error: ${unifiedError.code}`)
                 continue // Retry with the next key
 
@@ -185,49 +190,11 @@ function getAuthKey(request: Request, provider: string): string {
     return apiKeyStr
 }
 
-async function selectKey(keys: schema.Key[], model: string): Promise<schema.Key> {
-    const now = Date.now() / 1000
-    // Filter out keys that are currently in cooldown for the specific model
-    const availableKeys = keys.filter(key => {
-        const coolingEnd = key.modelCoolings?.[model]?.end_at
-        return !coolingEnd || coolingEnd < now
-    })
-
-    // If there are available keys, select one randomly
-    if (availableKeys.length > 0) {
-        const randomKey = availableKeys[Math.floor(Math.random() * availableKeys.length)]
-        console.info(`selected an available key ${randomKey.key} to try`)
-        return randomKey
-    }
-
-    // If all keys are in cooldown, find the one that will be available soonest
-    console.warn(`all keys are in cooldown for model ${model}, selecting the one with the earliest cooldown end time`)
-    let bestCoolingKey: schema.Key | null = null
-    let earliestCooldownEnd = Infinity
-
-    for (const key of keys) {
-        const coolingEnd = key.modelCoolings?.[model]?.end_at
-        if (coolingEnd && coolingEnd < earliestCooldownEnd) {
-            earliestCooldownEnd = coolingEnd
-            bestCoolingKey = key
-        }
-    }
-
-    if (!bestCoolingKey) {
-        console.error(
-            `Could not find a best cooling key, though all keys are supposed to be in cooldown. This indicates a logic issue. Falling back to a random key.`
-        )
-        return keys[Math.floor(Math.random() * keys.length)]
-    }
-
-    // Wait until the best key is available
-    const waitTime = earliestCooldownEnd - now
-    if (waitTime > 0) {
-        console.info(`wait for ${waitTime}s until key ${bestCoolingKey.key} is available`)
-        await new Promise(resolve => setTimeout(resolve, waitTime * 1000))
-    }
-
-    return bestCoolingKey
+function selectKey(availableKeys: schema.Key[]): schema.Key {
+    // Since the keys are pre-filtered by the database, we can just select one randomly.
+    const randomKey = availableKeys[Math.floor(Math.random() * availableKeys.length)]
+    console.info(`selected an available key ${randomKey.key} to try`)
+    return randomKey
 }
 
 async function makeGatewayRequest(

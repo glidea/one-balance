@@ -9,44 +9,60 @@ interface Cache<T> {
 }
 
 // only shared within a worker instance (shutdown if idle)
-let activeKeysCacheByProvider: Map<string, Cache<schema.Key[]>> = new Map()
+// The cache key is now a composite key: `${provider}:${model}`
+let availableKeysCache: Map<string, Cache<schema.Key[]>> = new Map()
 let cacheMaxAgeSeconds = 30
 
-export async function listActiveKeysViaCache(env: Env, provider: string): Promise<schema.Key[]> {
+export async function listAvailableKeysViaCache(env: Env, provider: string, model: string): Promise<schema.Key[]> {
     const now = Date.now() / 1000
-    const cache = activeKeysCacheByProvider.get(provider)
+    const cacheKey = `${provider}:${model}`
+    const cache = availableKeysCache.get(cacheKey)
 
     if (cache && now - cache.updatedAt < cacheMaxAgeSeconds && !cache.isDirty) {
         return cache.data
     }
 
-    // may thundering herd, but it should be enough
+    const modelKey = model.replace(/"/g, '""')
+    const endAtPath = `$.\"${modelKey}\".end_at`
+
     const keys = await d1.db(env).query.keys.findMany({
-        where: drizzle.and(drizzle.eq(schema.keys.status, 'active'), drizzle.eq(schema.keys.provider, provider))
+        where: drizzle.and(
+            drizzle.eq(schema.keys.status, 'active'),
+            drizzle.eq(schema.keys.provider, provider),
+            drizzle.or(
+                drizzle.sql`json_extract(${schema.keys.modelCoolings}, ${endAtPath}) IS NULL`,
+                drizzle.sql`json_extract(${schema.keys.modelCoolings}, ${endAtPath}) <= ${now}`
+            )
+        )
     })
 
-    // Do not cache empty results to avoid cache poisoning
     if (keys.length === 0) {
-        console.warn(`no active keys found for ${provider}, not caching.`)
+        console.warn(`no available keys found for provider ${provider} and model ${model}, not caching.`)
         return []
     }
 
-    activeKeysCacheByProvider.set(provider, {
+    availableKeysCache.set(cacheKey, {
         data: keys,
         updatedAt: now,
         isDirty: false
     })
 
-    console.info(`cache refreshed for ${provider}: ${keys.length} keys`)
+    console.info(`cache refreshed for ${provider}:${model}: ${keys.length} keys`)
     return keys
 }
 
 export async function setKeyStatus(env: Env, provider: string, keyId: string, status: string) {
     await d1.db(env).update(schema.keys).set({ status }).where(drizzle.eq(schema.keys.id, keyId))
 
-    const cache = activeKeysCacheByProvider.get(provider)
-    if (cache) {
-        cache.isDirty = true
+    // When a key is blocked, it affects all models for that provider.
+    // We need to mark all related cache entries as dirty.
+    for (const key of availableKeysCache.keys()) {
+        if (key.startsWith(`${provider}:`)) {
+            const cache = availableKeysCache.get(key)
+            if (cache) {
+                cache.isDirty = true
+            }
+        }
     }
 }
 
@@ -95,7 +111,9 @@ export async function setKeyModelCooldownIfAvailable(
         .returning({ updatedId: schema.keys.id })
 
     if (result.length > 0) {
-        const cache = activeKeysCacheByProvider.get(provider)
+        // Invalidate the specific cache for this provider and model.
+        const cacheKey = `${provider}:${model}`
+        const cache = availableKeysCache.get(cacheKey)
         if (cache) {
             cache.isDirty = true
         }
