@@ -131,7 +131,8 @@ async function forward(
                 console.error(
                     `key ${selectedKey.key} is blocked due to ${respFromGateway.status} ${await respFromGateway.text()}`
                 )
-                if (activeKeys.length > 1000) { // save the CPU time for Cloudflare Free plan
+                if (activeKeys.length > 1000) {
+                    // save the CPU time for Cloudflare Free plan
                     activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
                 }
                 continue
