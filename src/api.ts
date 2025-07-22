@@ -145,6 +145,10 @@ async function forward(
                 )
                 activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
                 continue
+
+            case 503:
+                console.error(`gateway returned 503 ${await respFromGateway.text()}`)
+                continue // no backoff, just retry...
         }
 
         // 200 or user, gateway, provider error
