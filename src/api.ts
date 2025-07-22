@@ -176,26 +176,32 @@ function getAuthKey(request: Request, provider: string): string {
 
 async function selectKey(keys: schema.Key[], model: string): Promise<schema.Key> {
     const now = Date.now() / 1000
-    const maxAttempts = 10
+    // Filter out keys that are currently in cooldown for the specific model
+    const availableKeys = keys.filter(key => {
+        const coolingEnd = key.modelCoolings?.[model]?.end_at
+        return !coolingEnd || coolingEnd < now
+    })
+
+    // If there are available keys, select one randomly
+    if (availableKeys.length > 0) {
+        const randomKey = availableKeys[Math.floor(Math.random() * availableKeys.length)]
+        console.info(`selected an available key ${randomKey.key} to try`)
+        return randomKey
+    }
+
+    // If all keys are in cooldown, find the one that will be available soonest
+    console.warn(`all keys are in cooldown for model ${model}, selecting the one with the earliest cooldown end time`)
     let bestCoolingKey: schema.Key | null = null
     let earliestCooldownEnd = Infinity
 
-    for (let i = 0; i < maxAttempts; i++) {
-        const randomKey = keys[Math.floor(Math.random() * keys.length)]
-        const coolingEnd = randomKey.modelCoolings?.[model]?.end_at
-
-        if (!coolingEnd || coolingEnd < now) {
-            console.info(`selected a key ${randomKey.key} to try; count: ${i + 1}`)
-            return randomKey
-        }
-
-        if (coolingEnd < earliestCooldownEnd) {
+    for (const key of keys) {
+        const coolingEnd = key.modelCoolings?.[model]?.end_at
+        if (coolingEnd && coolingEnd < earliestCooldownEnd) {
             earliestCooldownEnd = coolingEnd
-            bestCoolingKey = randomKey
+            bestCoolingKey = key
         }
     }
 
-    console.warn(`selected a cooling key ${bestCoolingKey?.key} to try`)
     return bestCoolingKey!
 }
 
@@ -255,34 +261,35 @@ async function keyIsInvalid(respFromGateway: Response, provider: string): Promis
 }
 
 async function analyze429CooldownSeconds(respFromGateway: Response, provider: string): Promise<number> {
-    if (provider !== 'google-ai-studio') {
-        return 65
-    }
-
-    try {
-        const errorBody = await respFromGateway.clone().json()
-        const quotaFailureDetail = getGoogleAiStudioErrorDetail(
-            errorBody,
-            'type.googleapis.com/google.rpc.QuotaFailure'
-        )
-        if (quotaFailureDetail) {
-            const violations = quotaFailureDetail.violations || []
-            for (const violation of violations) {
-                if (violation.quotaId === 'GenerateRequestsPerDayPerProjectPerModel-FreeTier') {
-                    return 24 * 60 * 60
+    if (provider === 'google-ai-studio') {
+        try {
+            const errorBody = await respFromGateway.json<any>()
+            const quotaFailureDetail = getGoogleAiStudioErrorDetail(errorBody, 'type.googleapis.com/google.rpc.QuotaFailure')
+            if (quotaFailureDetail) {
+                const violations = quotaFailureDetail.violations || []
+                for (const violation of violations) {
+                    if (violation.quotaId === 'GenerateRequestsPerDayPerProjectPerModel-FreeTier') {
+                        console.warn('Detected RPD limit, setting 24h cooldown.')
+                        return 24 * 60 * 60
+                    }
+                    // Handle TPM (Tokens Per Minute) limit by checking the description
+                    if (violation.description?.toLowerCase().includes('tokens per minute')) {
+                        console.warn('Detected TPM limit, setting 65s cooldown.')
+                        return 65 // Wait for the full minute window to reset + buffer
+                    }
                 }
             }
-        }
 
-        const retryInfoDetail = getGoogleAiStudioErrorDetail(errorBody, 'type.googleapis.com/google.rpc.RetryInfo')
-        if (retryInfoDetail && retryInfoDetail.retryDelay) {
-            const retrySeconds = parseInt(retryInfoDetail.retryDelay.replace('s', ''))
-            return retrySeconds + 2 // 2 seconds buffer
+            const retryInfoDetail = getGoogleAiStudioErrorDetail(errorBody, 'type.googleapis.com/google.rpc.RetryInfo')
+            if (retryInfoDetail && retryInfoDetail.retryDelay) {
+                const retrySeconds = parseInt(retryInfoDetail.retryDelay.replace('s', ''))
+                console.warn(`Detected RPM limit, using retry-after: ${retrySeconds}s.`)
+                return retrySeconds + 5 // Use a slightly larger buffer
+            }
+        } catch (error) {
+            console.error('failed to parse 429 response, fallback to 65 seconds', error)
         }
-    } catch (error) {
-        console.error('failed to parse 429 response, fallback to 65 seconds', error)
     }
-
     return 65
 }
 
