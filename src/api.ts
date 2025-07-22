@@ -1,6 +1,7 @@
 import * as keyService from './service/key'
 import * as util from './util'
 import type * as schema from './service/d1/schema'
+import { parseProviderError, UnifiedError } from './error'
 
 const PROVIDER_CUSTOM_AUTH_HEADER: Record<string, string> = {
     'google-ai-studio': 'x-goog-api-key',
@@ -114,44 +115,54 @@ async function forward(
             selectedKey.key
         )
         const respFromGateway = await fetch(reqToGateway)
-        const status = respFromGateway.status
-        switch (status) {
-            // try block
-            case 400:
-                if (!(await keyIsInvalid(respFromGateway, provider))) {
-                    return respFromGateway // user error
-                }
 
-            // key is invalid, then continue to block and next key
-            case 401:
-            case 403:
+        if (respFromGateway.ok) {
+            return respFromGateway
+        }
+
+        // Handle errors
+        const unifiedError = await parseProviderError(provider, respFromGateway)
+        console.error(`Error from ${provider}: ${unifiedError.message}`, unifiedError.original_error)
+
+        switch (unifiedError.code) {
+            case 'invalid_api_key':
+            case 'permission_denied':
                 ctx.waitUntil(keyService.setKeyStatus(env, provider, selectedKey.id, 'blocked'))
+                activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
+                console.error(`Key ${selectedKey.key} blocked due to: ${unifiedError.code}`)
+                continue // Retry with the next key
 
-                // next key
-                console.error(
-                    `key ${selectedKey.key} is blocked due to ${respFromGateway.status} ${await respFromGateway.text()}`
+            case 'rate_limit_exceeded': {
+                // Use dynamic cooldown if provider suggests one, otherwise fallback to a default.
+                const cooldownSeconds = unifiedError.retry_after_seconds ? unifiedError.retry_after_seconds + 5 : 65 // Add a 5s buffer
+                ctx.waitUntil(
+                    keyService.setKeyModelCooldownIfAvailable(env, selectedKey.id, provider, model, cooldownSeconds)
                 )
                 activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
-                continue
-
-            // try cooling down
-            case 429:
-                const sec = await analyze429CooldownSeconds(respFromGateway, provider)
-                ctx.waitUntil(keyService.setKeyModelCooldownIfAvailable(env, selectedKey.id, provider, model, sec))
-
-                // next key
                 console.warn(
-                    `key ${selectedKey.key} is cooling down for model ${model} due to 429 ${await respFromGateway.text()}`
+                    `Key ${selectedKey.key} cooling down for model ${model} for ${cooldownSeconds}s due to rate limit.`
                 )
-                activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
-                continue
-        }
+                continue // Retry with the next key
+            }
 
-        // 200 or user, gateway, provider error
-        if (status / 100 !== 2) {
-            console.error(`gateway returned ${status}`)
+            case 'service_unavailable':
+            case 'internal_server_error':
+                // These are potentially temporary, so we can retry with a different key.
+                activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
+                console.warn(`Retrying due to temporary error: ${unifiedError.code}`)
+                continue // Retry with the next key
+
+            case 'bad_request':
+            case 'not_found':
+            case 'unknown_error':
+            default:
+                // These are likely non-retriable user or configuration errors.
+                // Return the standardized error to the client.
+                return new Response(JSON.stringify(unifiedError), {
+                    status: unifiedError.status,
+                    headers: { 'Content-Type': 'application/json' }
+                })
         }
-        return respFromGateway
     }
 
     return new Response('Internal server error after retries', { status: 500 })
@@ -202,7 +213,21 @@ async function selectKey(keys: schema.Key[], model: string): Promise<schema.Key>
         }
     }
 
-    return bestCoolingKey!
+    if (!bestCoolingKey) {
+        console.error(
+            `Could not find a best cooling key, though all keys are supposed to be in cooldown. This indicates a logic issue. Falling back to a random key.`
+        )
+        return keys[Math.floor(Math.random() * keys.length)]
+    }
+
+    // Wait until the best key is available
+    const waitTime = earliestCooldownEnd - now
+    if (waitTime > 0) {
+        console.info(`wait for ${waitTime}s until key ${bestCoolingKey.key} is available`)
+        await new Promise(resolve => setTimeout(resolve, waitTime * 1000))
+    }
+
+    return bestCoolingKey
 }
 
 async function makeGatewayRequest(
@@ -240,71 +265,4 @@ function setAuthHeader(headers: Headers, restResource: string, key: string) {
     } else {
         headers.set('Authorization', `Bearer ${key}`)
     }
-}
-
-async function keyIsInvalid(respFromGateway: Response, provider: string): Promise<boolean> {
-    if (provider !== 'google-ai-studio') {
-        return false // TODO: support other providers
-    }
-
-    if (respFromGateway.status !== 400) {
-        return false
-    }
-
-    try {
-        const body = await respFromGateway.clone().json()
-        const detail = getGoogleAiStudioErrorDetail(body, 'type.googleapis.com/google.rpc.ErrorInfo')
-        return detail?.reason === 'API_KEY_INVALID' // may already deleted.
-    } catch {
-        return false
-    }
-}
-
-async function analyze429CooldownSeconds(respFromGateway: Response, provider: string): Promise<number> {
-    if (provider === 'google-ai-studio') {
-        try {
-            const errorBody = await respFromGateway.json<any>()
-            const quotaFailureDetail = getGoogleAiStudioErrorDetail(errorBody, 'type.googleapis.com/google.rpc.QuotaFailure')
-            if (quotaFailureDetail) {
-                const violations = quotaFailureDetail.violations || []
-                for (const violation of violations) {
-                    if (violation.quotaId === 'GenerateRequestsPerDayPerProjectPerModel-FreeTier') {
-                        console.warn('Detected RPD limit, setting 24h cooldown.')
-                        return 24 * 60 * 60
-                    }
-                    // Handle TPM (Tokens Per Minute) limit by checking the description
-                    if (violation.description?.toLowerCase().includes('tokens per minute')) {
-                        console.warn('Detected TPM limit, setting 65s cooldown.')
-                        return 65 // Wait for the full minute window to reset + buffer
-                    }
-                }
-            }
-
-            const retryInfoDetail = getGoogleAiStudioErrorDetail(errorBody, 'type.googleapis.com/google.rpc.RetryInfo')
-            if (retryInfoDetail && retryInfoDetail.retryDelay) {
-                const retrySeconds = parseInt(retryInfoDetail.retryDelay.replace('s', ''))
-                console.warn(`Detected RPM limit, using retry-after: ${retrySeconds}s.`)
-                return retrySeconds + 5 // Use a slightly larger buffer
-            }
-        } catch (error) {
-            console.error('failed to parse 429 response, fallback to 65 seconds', error)
-        }
-    }
-    return 65
-}
-
-function getGoogleAiStudioErrorDetail(body: any, type: string): any | null {
-    let errorBody = body
-    if (Array.isArray(body) && body.length > 0) {
-        errorBody = body[0]
-    }
-
-    const details = errorBody.error?.details || []
-    for (const detail of details) {
-        if (detail['@type'] === type) {
-            return detail
-        }
-    }
-
-    return null
 }

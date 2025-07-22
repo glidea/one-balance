@@ -25,6 +25,12 @@ export async function listActiveKeysViaCache(env: Env, provider: string): Promis
         where: drizzle.and(drizzle.eq(schema.keys.status, 'active'), drizzle.eq(schema.keys.provider, provider))
     })
 
+    // Do not cache empty results to avoid cache poisoning
+    if (keys.length === 0) {
+        console.warn(`no active keys found for ${provider}, not caching.`)
+        return []
+    }
+
     activeKeysCacheByProvider.set(provider, {
         data: keys,
         updatedAt: now,
