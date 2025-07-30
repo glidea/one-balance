@@ -151,8 +151,11 @@ async function forward(
                 }
                 continue
 
+            case 500:
+            case 502:
             case 503:
-                console.error(`gateway returned 503 ${await respFromGateway.text()}`)
+            case 504:
+                console.error(`gateway returned 5xx ${await respFromGateway.text()}`)
                 continue // no backoff, just retry...
         }
 
