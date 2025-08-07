@@ -44,7 +44,7 @@ export async function setKeyStatus(env: Env, provider: string, keyId: string, st
     }
 }
 
-export async function setKeyModelCooldownIfAvailable(
+export async function setModelCooldownIfAvailable(
     env: Env,
     keyId: string,
     provider: string,
@@ -98,7 +98,7 @@ export async function setKeyModelCooldownIfAvailable(
 
 // --- For Web UI ---
 
-export async function listKeys(
+export async function list(
     env: Env,
     provider: string,
     status: string,
@@ -152,7 +152,7 @@ interface KeyForAdd {
     remark: string
 }
 
-export async function addKeys(env: Env, keys: KeyForAdd[]) {
+export async function add(env: Env, keys: KeyForAdd[]) {
     if (keys.length === 0) {
         return
     }
@@ -165,7 +165,7 @@ export async function addKeys(env: Env, keys: KeyForAdd[]) {
     }
 }
 
-export async function delKeys(env: Env, keyIds: string[]) {
+export async function del(env: Env, keyIds: string[]) {
     if (keyIds.length === 0) {
         return
     }
@@ -173,7 +173,7 @@ export async function delKeys(env: Env, keyIds: string[]) {
     await d1.db(env).delete(schema.keys).where(drizzle.inArray(schema.keys.id, keyIds))
 }
 
-export async function delAllBlockedKeys(env: Env, provider: string) {
+export async function delAllBlocked(env: Env, provider: string) {
     await d1
         .db(env)
         .delete(schema.keys)

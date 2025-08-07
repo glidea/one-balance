@@ -1,4 +1,5 @@
 import * as keyService from './service/key'
+import * as customProviderService from './service/custom_provider'
 import * as util from './util'
 import type * as schema from './service/d1/schema'
 
@@ -61,12 +62,13 @@ async function handleKeys(request: Request, env: Env): Promise<Response> {
     }
 
     const parseResult = parseKeysRequest(request)
-    if (!parseResult.provider) {
-        return new Response(providersPage(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } })
-    }
-
     if (request.method === 'POST') {
         return await handleKeysPost(request, env, parseResult)
+    }
+
+    if (!parseResult.provider) {
+        const customProviders = await customProviderService.list(env)
+        return new Response(providersPage(customProviders), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } })
     }
 
     return await handleKeysGet(env, parseResult)
@@ -86,7 +88,7 @@ function checkAuth(request: Request, env: Env): Response | null {
 function parseKeysRequest(request: Request) {
     const url = new URL(request.url)
     const pathname = url.pathname
-    const providerMatch = pathname.match(/^\/keys\/([a-zA-Z0-9_-]+)/)
+    const providerMatch = pathname.match(/^\/keys\/([a-zA-Z0-9_.-]+)/)
 
     return {
         provider: providerMatch?.[1] || '',
@@ -114,15 +116,28 @@ async function handleKeysPost(
             .split(/[\n,]/)
             .map(k => k.trim())
             .filter(Boolean)
-        await keyService.addKeys(
+        await keyService.add(
             env,
             keys.map(key => ({ key, provider: params.provider, remark }))
         )
     } else if (action === 'delete') {
         const keyIds = formData.getAll('key_id') as string[]
-        await keyService.delKeys(env, keyIds)
+        await keyService.del(env, keyIds)
     } else if (action === 'delete-all-blocked') {
-        await keyService.delAllBlockedKeys(env, params.provider)
+        await keyService.delAllBlocked(env, params.provider)
+    } else if (action === 'add-custom-provider') {
+        const name = formData.get('name') as string
+        const baseURL = formData.get('base_url') as string
+        if (name && baseURL) {
+            await customProviderService.add(env, { name, baseURL })
+        }
+        return new Response(null, { status: 303, headers: { Location: '/' } })
+    } else if (action === 'delete-custom-provider') {
+        const id = formData.get('id') as string
+        if (id) {
+            await customProviderService.del(env, id)
+        }
+        return new Response(null, { status: 303, headers: { Location: '/' } })
     }
 
     const redirectParams = new URLSearchParams()
@@ -140,7 +155,7 @@ async function handleKeysPost(
 }
 
 async function handleKeysGet(env: Env, params: ReturnType<typeof parseKeysRequest>): Promise<Response> {
-    const { keys, total } = await keyService.listKeys(
+    const { keys, total } = await keyService.list(
         env,
         params.provider,
         params.status,
@@ -377,11 +392,20 @@ function loginPage(): string {
     return layout(content)
 }
 
-function providersPage(): string {
-    const providerLinks = PROVIDERS.map((p, index) => {
-        const config = PROVIDER_CONFIGS[p as keyof typeof PROVIDER_CONFIGS]
-        return `
-            <div class="glass-card rounded-3xl p-8 transition-all duration-500 hover:cursor-pointer group hover:shadow-2xl" style="animation-delay: ${index * 0.1}s;">
+function providersPage(customProviders: schema.CustomProvider[]): string {
+    const allProviders = [...PROVIDERS, ...customProviders.map(p => p.name)]
+    const providerLinks = allProviders
+        .map((p, index) => {
+            const config = PROVIDER_CONFIGS[p as keyof typeof PROVIDER_CONFIGS] || {
+                color: 'from-gray-400 to-gray-500',
+                icon: p.charAt(0).toUpperCase(),
+                bgColor: 'from-gray-50 to-gray-100'
+            }
+            const isCustom = customProviders.some(cp => cp.name === p)
+            const customProvider = customProviders.find(cp => cp.name === p)
+
+            return `
+            <div class="glass-card rounded-3xl p-8 transition-all duration-500 hover:cursor-pointer group hover:shadow-2xl relative" style="animation-delay: ${index * 0.1}s;">
                 <a href="/keys/${p}?status=active" class="block">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-5">
@@ -405,18 +429,69 @@ function providersPage(): string {
                         </div>
                     </div>
                 </a>
+                ${isCustom
+                    ? `
+                    <form method="POST" class="absolute top-2 right-2" onsubmit="return confirm('Are you sure you want to delete this provider?');">
+                        <input type="hidden" name="action" value="delete-custom-provider">
+                        <input type="hidden" name="id" value="${customProvider!.id}">
+                        <button type="submit" class="p-2 text-gray-400 hover:text-red-500 transition-colors duration-200">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                    </form>
+                `
+                    : ''
+                }
             </div>
         `
-    }).join('')
+        })
+        .join('')
 
     const content = `
-        <div class="text-center mb-20 relative">
-            <div class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-8 w-64 h-32 bg-gradient-to-r from-blue-200/20 to-purple-200/20 rounded-full blur-3xl"></div>
-            <h1 class="text-6xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-gray-900 bg-clip-text text-transparent mb-6 relative">Select Provider</h1>
+        <div class="flex justify-between items-center mb-12">
+            <div class="text-center">
+                <h1 class="text-6xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-gray-900 bg-clip-text text-transparent mb-6 relative">Select Provider</h1>
+            </div>
+            <button onclick="document.getElementById('addProviderModal').classList.remove('hidden')" class="btn-primary py-3 px-6 text-white font-bold rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-200 text-base tracking-wide">
+                Add Custom Provider
+            </button>
         </div>
         
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 max-w-7xl mx-auto">
             ${providerLinks}
+        </div>
+
+        <div id="addProviderModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm hidden items-center justify-center z-50">
+            <div class="glass-card bg-white rounded-3xl shadow-2xl border border-gray-200 max-w-md w-full mx-6" onclick="event.stopPropagation()">
+                <div class="p-8">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-2xl font-bold text-gray-900">Add Custom Provider</h3>
+                        <button onclick="document.getElementById('addProviderModal').classList.add('hidden')" class="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200">
+                            <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <form method="POST" class="space-y-6">
+                        <input type="hidden" name="action" value="add-custom-provider">
+                        <div>
+                            <label class="block text-gray-800 text-sm font-semibold mb-2">Provider Name</label>
+                            <input type="text" name="name" class="input-field w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none text-sm shadow-sm" placeholder="e.g. my-openai-proxy" required>
+                        </div>
+                        <div>
+                            <label class="block text-gray-800 text-sm font-semibold mb-2">Base URL</label>
+                            <input type="url" name="base_url" class="input-field w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none text-sm shadow-sm" placeholder="https://api.example.com/v1" required>
+                             <p class="text-xs text-gray-500 mt-2">The provider must be compatible with the OpenAI Chat Completions API format.</p>
+                        </div>
+                        <div class="flex justify-end pt-4">
+                            <button type="submit" class="btn-primary w-full py-3 px-6 text-white font-bold rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-200">
+                                Add Provider
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
     `
     return layout(content)

@@ -35,6 +35,32 @@ export const keys = sqlite.sqliteTable(
     }
 )
 
+export type CustomProvider = typeof customProviders.$inferSelect
+export const customProviders = sqlite.sqliteTable(
+    'custom_providers',
+    {
+        id: sqlite
+            .text('id')
+            .primaryKey()
+            .$defaultFn(() => crypto.randomUUID()),
+        name: sqlite.text('name').notNull().unique(),
+        baseURL: sqlite.text('base_url').notNull(),
+        createdAt: sqlite
+            .integer('created_at', { mode: 'timestamp' })
+            .notNull()
+            .default(drizzle.sql`(strftime('%s', 'now'))`),
+        updatedAt: sqlite
+            .integer('updated_at', { mode: 'timestamp' })
+            .notNull()
+            .default(drizzle.sql`(strftime('%s', 'now'))`)
+    },
+    table => {
+        return {
+            nameUnqIdx: sqlite.uniqueIndex('name_unq_idx').on(table.name)
+        }
+    }
+)
+
 interface ModelCooling {
     total_seconds: number // across all times
     end_at: number

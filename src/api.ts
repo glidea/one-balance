@@ -1,4 +1,5 @@
 import * as keyService from './service/key'
+import * as customProviderService from './service/custom_provider'
 import * as util from './util'
 import type * as schema from './service/d1/schema'
 
@@ -10,9 +11,30 @@ const PROVIDER_CUSTOM_AUTH_HEADER: Record<string, string> = {
     cartesia: 'X-API-Key'
 }
 
+let customProvidersCache: Map<string, schema.CustomProvider> | null = null
+let customProvidersCacheUpdatedAt = 0
+
+async function refreshCustomProvidersCache(env: Env) {
+    const now = Date.now() / 1000
+    if (now - customProvidersCacheUpdatedAt < 60) {
+        return
+    }
+
+    const providers = await customProviderService.list(env)
+    customProvidersCache = new Map(providers.map(p => [p.name, p]))
+    customProvidersCacheUpdatedAt = now
+    console.info(`custom providers cache refreshed with ${providers.length} providers`)
+}
+
 export async function handle(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
     const restResource = url.pathname.substring('/api/'.length) + url.search
+
+    if (customProvidersCache === null) {
+        await refreshCustomProvidersCache(env)
+    } else {
+        ctx.waitUntil(refreshCustomProvidersCache(env))
+    }
 
     const provider = restResource.split('/')[0]
     const authKey = getAuthKey(request, provider)
@@ -140,7 +162,7 @@ async function forward(
             // try cooling down
             case 429:
                 const sec = await analyze429CooldownSeconds(respFromGateway, provider, selectedKey.id)
-                ctx.waitUntil(keyService.setKeyModelCooldownIfAvailable(env, selectedKey.id, provider, model, sec))
+                ctx.waitUntil(keyService.setModelCooldownIfAvailable(env, selectedKey.id, provider, model, sec))
 
                 // next key
                 console.warn(
@@ -248,14 +270,26 @@ async function makeGatewayRequest(
     key: string
 ): Promise<Request> {
     const newHeaders = new Headers(headers)
-    setAuthHeader(newHeaders, restResource, key)
+    const provider = restResource.split('/')[0]
 
-    // TODO: may use url from env directly for low latency.
-    let base = await env.AI.gateway(env.AI_GATEWAY).getUrl()
-    if (!base.endsWith('/')) {
-        base += '/'
+    let url: string
+    const customProvider = customProvidersCache?.get(provider)
+    if (customProvider) {
+        let base = customProvider.baseURL
+        if (!base.endsWith('/')) {
+            base += '/'
+        }
+        url = `${base}${restResource.substring(provider.length + 1)}`
+        newHeaders.set('Authorization', `Bearer ${key}`)
+
+    } else {
+        setAuthHeader(newHeaders, restResource, key)
+        let base = await env.AI.gateway(env.AI_GATEWAY).getUrl()
+        if (!base.endsWith('/')) {
+            base += '/'
+        }
+        url = `${base}${restResource}`
     }
-    const url = `${base}${restResource}`
 
     return new Request(url, {
         method: method,
@@ -297,7 +331,7 @@ async function keyIsInvalid(respFromGateway: Response, provider: string): Promis
 // Using an in-memory Map to count consecutive 429s is a design choice to prioritize performance and minimize costs.
 // - Why not use D1 (DB)? To avoid database writes on every 429 error, which would increase load and latency. We only write to the DB when a key needs to be cooled down.
 // - Why not use KV? The free tier has low write quotas. Also, KV's eventual consistency makes it unsuitable for precise, real-time counting.
-// Limitation: This counter is local to each worker instance and not shared globally. If requests for the same key are routed to different instances, the count may be inaccurate. 
+// Limitation: This counter is local to each worker instance and not shared globally. If requests for the same key are routed to different instances, the count may be inaccurate.
 // However, for short-lived consecutive requests, Cloudflare often routes them to the same instance, making this a practical trade-off.
 let consecutive429CountByKeyId: Map<string, number> = new Map()
 
