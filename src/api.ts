@@ -139,7 +139,7 @@ async function forward(
 
             // try cooling down
             case 429:
-                const sec = await analyze429CooldownSeconds(respFromGateway, provider)
+                const sec = await analyze429CooldownSeconds(respFromGateway, provider, selectedKey.id)
                 ctx.waitUntil(keyService.setKeyModelCooldownIfAvailable(env, selectedKey.id, provider, model, sec))
 
                 // next key
@@ -159,8 +159,9 @@ async function forward(
                 continue // no backoff, just retry...
         }
 
-        // 200 or user, gateway, provider error
-        if (status / 100 !== 2) {
+        if (status / 100 === 2) {
+            consecutive429CountByKeyId.delete(selectedKey.id)
+        } else {
             console.error(`gateway returned ${status}`)
         }
         return respFromGateway
@@ -293,7 +294,23 @@ async function keyIsInvalid(respFromGateway: Response, provider: string): Promis
     }
 }
 
-async function analyze429CooldownSeconds(respFromGateway: Response, provider: string): Promise<number> {
+// Using an in-memory Map to count consecutive 429s is a design choice to prioritize performance and minimize costs.
+// - Why not use D1 (DB)? To avoid database writes on every 429 error, which would increase load and latency. We only write to the DB when a key needs to be cooled down.
+// - Why not use KV? The free tier has low write quotas. Also, KV's eventual consistency makes it unsuitable for precise, real-time counting.
+// Limitation: This counter is local to each worker instance and not shared globally. If requests for the same key are routed to different instances, the count may be inaccurate. 
+// However, for short-lived consecutive requests, Cloudflare often routes them to the same instance, making this a practical trade-off.
+let consecutive429CountByKeyId: Map<string, number> = new Map()
+
+async function analyze429CooldownSeconds(respFromGateway: Response, provider: string, keyId: string): Promise<number> {
+    const count = (consecutive429CountByKeyId.get(keyId) || 0) + 1
+    consecutive429CountByKeyId.set(keyId, count)
+
+    if (count >= 3) {
+        consecutive429CountByKeyId.delete(keyId)
+        console.error(`key triggered long cooldown after 3 consecutive 429s`)
+        return provider === 'google-ai-studio' ? util.getSecondsUntilMidnightPT() : 24 * 60 * 60
+    }
+
     if (provider !== 'google-ai-studio') {
         return 65
     }

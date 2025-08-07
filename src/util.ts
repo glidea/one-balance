@@ -17,7 +17,7 @@ export function getSecondsUntilMidnightPT(): number {
         hour: 'numeric',
         minute: 'numeric',
         second: 'numeric',
-        hour12: false,
+        hour12: false
     })
 
     const parts = formatter.formatToParts(now)
