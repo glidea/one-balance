@@ -563,11 +563,14 @@ function buildEmptyState(): string {
 }
 
 function buildCopyableKey(key: string): string {
+    const displayKey = `${key.substring(0, 4)}...${key.substring(key.length - 4)}`
     return `
         <div class="relative inline-block">
-            <code class="px-3 py-2 bg-slate-200/80 border border-slate-300/70 rounded-lg text-sm font-mono text-slate-900 cursor-pointer hover:bg-slate-300/80 hover:border-slate-400/70 transition-all duration-200 inline-block truncate max-w-full group-hover:shadow-sm backdrop-blur-sm" 
-                  onclick="copyToClipboard('${key.replace(/'/g, "\\'")}', this)" 
-                  title="Click to copy">${key}</code>
+            <code class="px-3 py-2 bg-slate-200/80 border border-slate-300/70 rounded-lg text-sm font-mono text-slate-900 cursor-pointer hover:bg-slate-300/80 hover:border-slate-400/70 transition-all duration-200 inline-block group-hover:shadow-sm backdrop-blur-sm"
+                  onclick="copyToClipboard('${key.replace(/'/g, "\\'")}', this)"
+                  title="Click to copy">
+                <span class="font-mono">${displayKey}</span>
+            </code>
             <div class="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-emerald-700 text-white text-xs px-2 py-1 rounded opacity-0 pointer-events-none transition-opacity duration-300 whitespace-nowrap copy-tooltip backdrop-blur-sm">
                 Copied!
             </div>
