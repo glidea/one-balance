@@ -111,7 +111,9 @@ export async function listKeys(
     const db = d1.db(env)
     const conditions = [drizzle.eq(schema.keys.provider, provider), drizzle.eq(schema.keys.status, status)]
     if (q) {
-        conditions.push(drizzle.like(schema.keys.key, `%${q}%`))
+        conditions.push(
+            drizzle.or(drizzle.like(schema.keys.key, `%${q}%`), drizzle.like(schema.keys.remark, `%${q}%`))
+        )
     }
 
     const where = drizzle.and(...conditions)
@@ -147,6 +149,7 @@ export async function listKeys(
 interface KeyForAdd {
     key: string
     provider: string
+    remark: string
 }
 
 export async function addKeys(env: Env, keys: KeyForAdd[]) {

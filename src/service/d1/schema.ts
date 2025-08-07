@@ -14,6 +14,7 @@ export const keys = sqlite.sqliteTable(
         modelCoolings: sqlite.text('model_coolings', { mode: 'json' }).$type<Record<string, ModelCooling>>(),
         totalCoolingSeconds: sqlite.integer('total_cooling_seconds').notNull().default(0), // across all models, in seconds
         status: sqlite.text('status').notNull().default('active'), // active, blocked
+        remark: sqlite.text('remark'),
         createdAt: sqlite
             .integer('created_at', { mode: 'timestamp' })
             .notNull()
