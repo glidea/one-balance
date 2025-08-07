@@ -308,7 +308,7 @@ async function analyze429CooldownSeconds(respFromGateway: Response, provider: st
             const violations = quotaFailureDetail.violations || []
             for (const violation of violations) {
                 if (violation.quotaId === 'GenerateRequestsPerDayPerProjectPerModel-FreeTier') {
-                    return 24 * 60 * 60
+                    return util.getSecondsUntilMidnightPT() // Requests per day (RPD) quotas reset at midnight Pacific time
                 }
             }
         }
