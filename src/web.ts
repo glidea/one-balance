@@ -109,13 +109,14 @@ async function handleKeysPost(
 
     if (action === 'add') {
         const keysStr = formData.get('keys') as string
+        const remark = formData.get('remark') as string
         const keys = keysStr
             .split(/[\n,]/)
             .map(k => k.trim())
             .filter(Boolean)
         await keyService.addKeys(
             env,
-            keys.map(key => ({ key, provider: params.provider }))
+            keys.map(key => ({ key, provider: params.provider, remark }))
         )
     } else if (action === 'delete') {
         const keyIds = formData.getAll('key_id') as string[]
@@ -533,6 +534,7 @@ function buildKeyRows(keys: schema.Key[]): string {
                 <td class="p-4">
                     ${buildCopyableKey(k.key)}
                 </td>
+                <td class="p-4 text-sm text-slate-700 font-medium">${k.remark || ''}</td>
                 <td class="p-4">
                     <span class="text-sm text-slate-800 cursor-pointer hover:text-blue-700 transition-colors duration-200 font-medium px-2 py-1 rounded-md hover:bg-blue-100/80 backdrop-blur-sm" 
                           onclick="showModelCoolings('${modelCoolingsJson}', '${k.key.substring(0, 20)}...')"
@@ -836,7 +838,8 @@ function buildTableContent(
             <table class="w-full table-fixed">
                 <colgroup>
                     <col class="w-12">
-                    <col class="w-80">
+                    <col class="w-64">
+                    <col class="w-48">
                     <col class="w-32">
                     <col class="w-24">
                 </colgroup>
@@ -848,6 +851,7 @@ function buildTableContent(
                                    class="h-4 w-4 text-blue-600 bg-white border-gray-500 rounded focus:ring-blue-500 transition-colors backdrop-blur-sm">
                         </th>
                         <th class="p-4 text-left font-semibold text-slate-800 text-sm tracking-wide">API Key</th>
+                        <th class="p-4 text-left font-semibold text-slate-800 text-sm tracking-wide">Remark</th>
                         <th class="p-4 text-left font-semibold text-slate-800 text-sm tracking-wide">
                             <a href="${coolingLink}" class="flex items-center gap-2 hover:text-blue-700 transition-colors duration-200">
                                 <span>Cooling Time</span>
@@ -932,6 +936,12 @@ function buildAddKeysForm(
                               class="input-field w-full p-4 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none font-mono text-sm resize-none shadow-sm" 
                               rows="4" 
                               placeholder="Enter API keys, one per line or separated by commas"></textarea>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-800 text-sm font-semibold mb-3">Remark</label>
+                    <input name="remark"
+                              class="input-field w-full p-4 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none text-sm shadow-sm"
+                              placeholder="Enter remark for these keys (optional)"/>
                 </div>
                 <div class="flex justify-end">
                     <button type="submit" 
