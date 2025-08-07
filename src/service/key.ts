@@ -112,7 +112,7 @@ export async function listKeys(
     const conditions = [drizzle.eq(schema.keys.provider, provider), drizzle.eq(schema.keys.status, status)]
     if (q) {
         conditions.push(
-            drizzle.or(drizzle.like(schema.keys.key, `%${q}%`), drizzle.like(schema.keys.remark, `%${q}%`))
+            drizzle.or(drizzle.like(schema.keys.key, `%${q}%`), drizzle.like(schema.keys.remark, `%${q}%`))!
         )
     }
 
