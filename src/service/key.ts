@@ -21,9 +21,16 @@ export async function listActiveKeysViaCache(env: Env, provider: string): Promis
     }
 
     // may thundering herd, but it should be enough
-    const keys = await d1.db(env).query.keys.findMany({
-        where: drizzle.and(drizzle.eq(schema.keys.status, 'active'), drizzle.eq(schema.keys.provider, provider))
-    })
+    const keys = (await d1.db(env).query.keys.findMany({
+        columns: {
+            id: true,
+            key: true,
+            modelCoolings: true
+        },
+        where: drizzle.and(drizzle.eq(schema.keys.status, 'active'), drizzle.eq(schema.keys.provider, provider)),
+        orderBy: drizzle.sql`RANDOM()`,
+        limit: 1000
+    })) as schema.Key[]
 
     activeKeysCacheByProvider.set(provider, {
         data: keys,

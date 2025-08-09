@@ -131,7 +131,7 @@ async function forward(
                 console.error(
                     `key ${selectedKey.key} is blocked due to ${respFromGateway.status} ${await respFromGateway.text()}`
                 )
-                if (activeKeys.length > 1000) {
+                if (activeKeys.length < 500) {
                     // save the CPU time for Cloudflare Free plan
                     activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
                 }
@@ -139,14 +139,14 @@ async function forward(
 
             // try cooling down
             case 429:
-                const sec = await analyze429CooldownSeconds(env, respFromGateway, provider, selectedKey.id)
+                const sec = await analyze429CooldownSeconds(env, respFromGateway, provider, selectedKey.key)
                 ctx.waitUntil(keyService.setKeyModelCooldownIfAvailable(env, selectedKey.id, provider, model, sec))
 
                 // next key
                 console.warn(
                     `key ${selectedKey.key} is cooling down for model ${model} due to 429 ${await respFromGateway.text()}`
                 )
-                if (activeKeys.length > 1000) {
+                if (activeKeys.length < 500) {
                     activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
                 }
                 continue
@@ -160,7 +160,7 @@ async function forward(
         }
 
         if (status / 100 === 2) {
-            consecutive429CountByKeyId.delete(selectedKey.id)
+            consecutive429Count.delete(selectedKey.id)
         } else {
             console.error(`gateway returned ${status}`)
         }
@@ -299,20 +299,20 @@ async function keyIsInvalid(respFromGateway: Response, provider: string): Promis
 // - Why not use KV? The free tier has low write quotas. Also, KV's eventual consistency makes it unsuitable for precise, real-time counting.
 // Limitation: This counter is local to each worker instance and not shared globally. If requests for the same key are routed to different instances, the count may be inaccurate.
 // However, for short-lived consecutive requests, Cloudflare often routes them to the same instance, making this a practical trade-off.
-let consecutive429CountByKeyId: Map<string, number> = new Map()
+let consecutive429Count: Map<string, number> = new Map()
 
 async function analyze429CooldownSeconds(
     env: Env,
     respFromGateway: Response,
     provider: string,
-    keyId: string
+    key: string
 ): Promise<number> {
-    const count = (consecutive429CountByKeyId.get(keyId) || 0) + 1
-    consecutive429CountByKeyId.set(keyId, count)
+    const count = (consecutive429Count.get(key) || 0) + 1
+    consecutive429Count.set(key, count)
 
     if (count >= Number(env.CONSECUTIVE_429_THRESHOLD)) {
-        consecutive429CountByKeyId.delete(keyId)
-        console.error(`key ${keyId} triggered long cooldown after ${env.CONSECUTIVE_429_THRESHOLD} consecutive 429s`)
+        consecutive429Count.delete(key)
+        console.error(`key ${key} triggered long cooldown after ${env.CONSECUTIVE_429_THRESHOLD} consecutive 429s`)
         return provider === 'google-ai-studio' ? util.getSecondsUntilMidnightPT() : 24 * 60 * 60
     }
 
