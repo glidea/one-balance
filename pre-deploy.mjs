@@ -52,12 +52,18 @@ async function main() {
         process.exit(1)
     }
 
-    const authKey = process.env.AUTH_KEY
     const config = getWranglerConfig()
 
+    const authKey = process.env.AUTH_KEY
     if (authKey) {
         console.log(`Setting AUTH_KEY to '${authKey}'...`)
         config.vars.AUTH_KEY = authKey
+    }
+
+    const consecutive429Threshold = process.env.CONSECUTIVE_429_THRESHOLD
+    if (consecutive429Threshold) {
+        console.log(`Setting CONSECUTIVE_429_THRESHOLD to '${consecutive429Threshold}'...`)
+        config.vars.CONSECUTIVE_429_THRESHOLD = consecutive429Threshold
     }
 
     // TODO: auto create ai gateway when wrangler supports it
