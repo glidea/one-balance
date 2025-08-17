@@ -16,13 +16,13 @@ export async function handle(request: Request, env: Env, ctx: ExecutionContext):
 
     const provider = restResource.split('/')[0]
     const authKey = getAuthKey(request, provider)
-    if (!util.isValidAuthKey(authKey, env.AUTH_KEY)) {
-        return new Response('Invalid auth key', { status: 403 })
-    }
-
     const realProviderAndModel = await extractRealProviderAndModel(request, restResource, provider)
     if (!realProviderAndModel) {
         return new Response('Not supported request: valid provider or model not found', { status: 400 })
+    }
+
+    if (!util.isApiRequestAllowed(authKey, env.AUTH_KEY, realProviderAndModel.provider, realProviderAndModel.model)) {
+        return new Response('Invalid auth key', { status: 403 })
     }
 
     return await forward(request, env, ctx, restResource, realProviderAndModel.provider, realProviderAndModel.model)

@@ -44,7 +44,7 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
     const formData = await request.formData()
     const key = formData.get('auth_key') as string
 
-    if (util.isValidAuthKey(key, env.AUTH_KEY)) {
+    if (util.isWebUiRequestAllowed(key, env.AUTH_KEY)) {
         const headers = new Headers()
         headers.set('Set-Cookie', `auth_key=${key}; HttpOnly; Path=/; SameSite=Strict; Max-Age=2147483647`)
         headers.set('Location', '/keys')
@@ -76,7 +76,7 @@ function checkAuth(request: Request, env: Env): Response | null {
     const cookie = request.headers.get('Cookie')
     const authKey = cookie?.match(/auth_key=([^;]+)/)?.[1] as string
 
-    if (!util.isValidAuthKey(authKey, env.AUTH_KEY)) {
+    if (!util.isWebUiRequestAllowed(authKey, env.AUTH_KEY)) {
         return new Response(loginPage(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } })
     }
 

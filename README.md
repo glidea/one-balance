@@ -74,6 +74,19 @@ $env:AUTH_KEY = "your-super-secret-auth-key"; pnpm run deploycf
 - **OpenAI**: `Authorization: Bearer <AUTH_KEY>`
 - **Google, Anthropic, Elevenlabs, Azure OpenAI, Cartesia**: 使用对应的自定义 Header，例如 `x-goog-api-key: <AUTH_KEY>`。
 
+##### 高级认证配置
+
+`AUTH_KEY` 环境变量支持更复杂的配置，允许多个 key，并为每个 key 设置独立的权限和过期时间。格式如下：
+
+`AUTH_KEY="key1=provider1,model1,model2;key2;key3(1758077793)=provider2&provider3"`
+
+- **分隔符**: 多个 key 定义使用分号 (`;`) 分隔。
+- **无限制 Key**: `key2` 是一个无限制的 key，它可以访问所有提供商和模型。**只有无限制的 key 才能登录 Web UI 管理界面**。
+- **带过期时间的 Key**: `key3(1758077793)` 在 key 后面括号内附加一个 Unix 时间戳 (秒)，表示该 key 的过期时间。
+- **权限控制**:
+    - `key1=provider1,model1,model2`: `key1` 只能使用 `provider1` 的 `model1` 和 `model2`。
+    - `key3=...=provider2&provider3`: `key3` 只能使用 `provider2` 和 `provider3` 下的所有模型。使用 `&` 分隔多个提供商。
+
 ### 示例 (使用 `curl`)
 
 #### 直接使用 Gemini 格式请求 Google Gemini（支持流式）

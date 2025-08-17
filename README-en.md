@@ -70,6 +70,19 @@ The `AUTH_KEY` set during deployment needs to be sent via the corresponding prov
 - **OpenAI**: `Authorization: Bearer <AUTH_KEY>`
 - **Google, Anthropic, Elevenlabs, Azure OpenAI, Cartesia**: Use the corresponding custom header, for example, `x-goog-api-key: <AUTH_KEY>`.
 
+##### Advanced Authentication Configuration
+
+The `AUTH_KEY` environment variable supports a more complex format, allowing multiple keys, each with its own permissions and expiration time. The format is as follows:
+
+`AUTH_KEY="key1=provider1,model1,model2;key2;key3(1758077793)=provider2&provider3"`
+
+- **Separator**: Multiple key definitions are separated by a semicolon (`;`).
+- **Unrestricted Keys**: `key2` is an unrestricted key. It can access all providers and models. **Only unrestricted keys can log in to the Web UI.**
+- **Keys with Expiration**: `key3(1758077793)` has a Unix timestamp (in seconds) appended in parentheses, which sets the key's expiration time.
+- **Permission Control**:
+    - `key1=provider1,model1,model2`: `key1` is restricted to use only `model1` and `model2` from `provider1`.
+    - `key3=...=provider2&provider3`: `key3` is restricted to use any model from `provider2` and `provider3`. Multiple providers are separated by `&`.
+
 ### Examples (using `curl`)
 
 #### Requesting Google Gemini (OpenAI-compatible format)
