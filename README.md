@@ -148,16 +148,6 @@ curl https://<your-worker-url>/api/openai/v1/chat/completions \
 
 ![](images/cherry-studio.png)
 
-## Roadmap
-
-[ ] 支持 key 动态转发
-
-[ ] 支持自定义渠道
-
-[ ] 支持虚拟 Model，聚合多个渠道
-
-[ ] 支持分发用户 Key
-
 ## How it work
 
 ### 架构

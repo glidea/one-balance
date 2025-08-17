@@ -8,9 +8,17 @@ type AuthKey = {
     expiresAt?: number // unix timestamp in seconds
 }
 
+const parseCache = new Map<string, AuthKey[]>()
+
 function parseAuthKeys(authKeysStr: string): AuthKey[] {
+    if (parseCache.has(authKeysStr)) {
+        return parseCache.get(authKeysStr)!
+    }
+
     if (!authKeysStr) {
-        return []
+        const result: AuthKey[] = []
+        parseCache.set(authKeysStr, result)
+        return result
     }
 
     const keys: AuthKey[] = []
@@ -53,6 +61,7 @@ function parseAuthKeys(authKeysStr: string): AuthKey[] {
         keys.push({ key, unrestricted: false, allowed, expiresAt })
     }
 
+    parseCache.set(authKeysStr, keys)
     return keys
 }
 
