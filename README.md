@@ -85,7 +85,7 @@ $env:AUTH_KEY = "your-super-secret-auth-key"; pnpm run deploycf
 - **带过期时间的 Key**: `key3(1758077793)` 在 key 后面括号内附加一个 Unix 时间戳 (秒)，表示该 key 的过期时间。
 - **权限控制**:
     - `key1=provider1,model1,model2`: `key1` 只能使用 `provider1` 的 `model1` 和 `model2`。
-    - `key3=...=provider2&provider3`: `key3` 只能使用 `provider2` 和 `provider3` 下的所有模型。使用 `&` 分隔多个提供商。
+    - `key3=provider2&provider3`: `key3` 只能使用 `provider2` 和 `provider3` 下的所有模型。使用 `&` 分隔多个提供商。
 
 ### 示例 (使用 `curl`)
 
