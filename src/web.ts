@@ -9,7 +9,7 @@ const PROVIDER_CONFIGS = {
     'azure-openai': { color: 'from-blue-500 to-cyan-400', icon: '⊞', bgColor: 'from-blue-50 to-cyan-50' },
     'aws-bedrock': { color: 'from-yellow-500 to-orange-500', icon: '◆', bgColor: 'from-yellow-50 to-orange-50' },
     cartesia: { color: 'from-purple-400 to-pink-400', icon: 'C', bgColor: 'from-purple-50 to-pink-50' },
-    'cerebras-ai': { color: 'from-gray-600 to-gray-800', icon: '◉', bgColor: 'from-gray-50 to-gray-100' },
+    'cerebras': { color: 'from-gray-600 to-gray-800', icon: '◉', bgColor: 'from-gray-50 to-gray-100' },
     cohere: { color: 'from-green-400 to-teal-500', icon: '●', bgColor: 'from-green-50 to-teal-50' },
     deepseek: { color: 'from-indigo-500 to-purple-600', icon: '◈', bgColor: 'from-indigo-50 to-purple-50' },
     elevenlabs: { color: 'from-pink-400 to-rose-500', icon: '♫', bgColor: 'from-pink-50 to-rose-50' },
