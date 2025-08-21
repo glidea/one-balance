@@ -98,7 +98,7 @@ async function forward(
     }
 
     const body = request.body ? await request.arrayBuffer() : null
-    const MAX_RETRIES = 10
+    const MAX_RETRIES = 30
     for (let i = 0; i < MAX_RETRIES; i++) {
         if (activeKeys.length === 0) {
             return new Response('No active keys available', { status: 503 })
