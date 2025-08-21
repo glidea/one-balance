@@ -10,6 +10,10 @@ const PROVIDER_CUSTOM_AUTH_HEADER: Record<string, string> = {
     cartesia: 'X-API-Key'
 }
 
+function getAuthHeaderName(provider: string): string {
+    return PROVIDER_CUSTOM_AUTH_HEADER[provider] || 'Authorization'
+}
+
 export async function handle(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
     const restResource = url.pathname.substring('/api/'.length) + url.search
@@ -171,20 +175,30 @@ async function forward(
 }
 
 function getAuthKey(request: Request, provider: string): string {
-    let header = PROVIDER_CUSTOM_AUTH_HEADER[provider]
-    if (!header) {
-        header = 'Authorization'
+    if (provider === 'google-ai-studio') {
+        // try to get auth key from query params
+        const key = new URL(request.url).searchParams.get('key')
+        if (key) {
+            return key
+        }
     }
 
-    let apiKeyStr = request.headers.get(header)
-    if (!apiKeyStr) {
+    return getAuthKeyFromHeader(request, provider)
+}
+
+function getAuthKeyFromHeader(request: Request, provider: string): string {
+    const h = getAuthHeaderName(provider)
+    let v = request.headers.get(h)
+    if (!v) {
         return ''
     }
 
-    if (header === 'Authorization') {
-        apiKeyStr = apiKeyStr.replace(/^Bearer\s+/, '')
+    let key = v
+    if (h === 'Authorization') {
+        key = v.replace(/^Bearer\s+/, '')
     }
-    return apiKeyStr
+
+    return key
 }
 
 async function selectKey(keys: schema.Key[], model: string): Promise<schema.Key> {
@@ -268,12 +282,13 @@ async function makeGatewayRequest(
 function setAuthHeader(headers: Headers, restResource: string, key: string) {
     const provider = restResource.split('/')[0]
 
-    let header = PROVIDER_CUSTOM_AUTH_HEADER[provider]
-    if (header) {
-        headers.set(header, key)
-    } else {
-        headers.set('Authorization', `Bearer ${key}`)
+    let v = key
+    const h = getAuthHeaderName(provider)
+    if (h == 'Authorization') {
+        v = `Bearer ${key}`
     }
+
+    headers.set(h, v)
 }
 
 async function keyIsInvalid(respFromGateway: Response, provider: string): Promise<boolean> {
