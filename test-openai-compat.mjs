@@ -172,6 +172,32 @@ async function testChineseEncoding() {
     }
 }
 
+async function testModelsEndpoint() {
+    console.log('🧪 测试模型列表端点...')
+
+    const response = await fetch(`${WORKER_URL}/api/compat/models`, {
+        method: 'GET',
+        headers: {
+            Authorization: `Bearer ${AUTH_KEY}`
+        }
+    })
+
+    if (!response.ok) {
+        console.error('❌ 模型列表请求失败:', response.status, await response.text())
+        return false
+    }
+
+    const data = await response.json()
+    console.log('✅ 模型列表响应成功')
+    console.log('📝 可用模型数量:', data.data?.length || 0)
+    if (data.data && data.data.length > 0) {
+        console.log('📋 模型示例:', data.data.slice(0, 3).map(m => m.id))
+    }
+    console.log('📊 响应格式:', data.object)
+
+    return true
+}
+
 async function main() {
     console.log('🚀 开始测试 OpenAI 兼容格式和中文编码...')
     console.log(`🔗 目标地址: ${WORKER_URL}`)
@@ -188,6 +214,9 @@ async function main() {
     }
 
     try {
+        await testModelsEndpoint()
+        console.log('─'.repeat(60))
+
         await testNonStreamRequest()
         console.log('─'.repeat(60))
 

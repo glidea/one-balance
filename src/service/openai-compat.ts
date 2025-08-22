@@ -329,3 +329,89 @@ function getFinishReason(candidate: any): string | null {
 function generateId(): string {
     return Math.random().toString(36).substring(2, 15)
 }
+
+export function isModelsRequest(restResource: string): boolean {
+    return restResource === 'compat/models'
+}
+
+export async function handleModelsRequest(apiKey: string): Promise<Response> {
+    try {
+        // 尝试获取Google AI Studio的模型列表
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + apiKey, {
+            signal: AbortSignal.timeout(5000) // 5秒超时
+        })
+        
+        if (!response.ok) {
+            console.warn('Google AI Studio API returned error, falling back to static list')
+            return getFallbackModels()
+        }
+
+        const data = await response.json() as any
+        const models = data.models || []
+
+        // 转换为OpenAI格式的模型列表
+        const openaiModels = models
+            .filter((model: any) => model.name && model.name.includes('gemini'))
+            .map((model: any) => ({
+                id: model.name.replace('models/', ''),
+                object: 'model',
+                created: Math.floor(Date.now() / 1000),
+                owned_by: 'google'
+            }))
+
+        return new Response(
+            JSON.stringify({
+                object: 'list',
+                data: openaiModels
+            }, null, 2),
+            { 
+                status: 200, 
+                headers: { 'Content-Type': 'application/json' } 
+            }
+        )
+    } catch (error) {
+        console.warn('Failed to fetch models from Google AI Studio, using fallback list:', error.message)
+        return getFallbackModels()
+    }
+}
+
+function getFallbackModels(): Response {
+    // 静态的Gemini模型列表，作为后备方案
+    const fallbackModels = [
+        {
+            id: 'gemini-2.0-flash',
+            object: 'model',
+            created: Math.floor(Date.now() / 1000),
+            owned_by: 'google'
+        },
+        {
+            id: 'gemini-1.5-pro',
+            object: 'model', 
+            created: Math.floor(Date.now() / 1000),
+            owned_by: 'google'
+        },
+        {
+            id: 'gemini-1.5-flash',
+            object: 'model',
+            created: Math.floor(Date.now() / 1000),
+            owned_by: 'google'
+        },
+        {
+            id: 'gemini-pro',
+            object: 'model',
+            created: Math.floor(Date.now() / 1000),
+            owned_by: 'google'
+        }
+    ]
+
+    return new Response(
+        JSON.stringify({
+            object: 'list',
+            data: fallbackModels
+        }, null, 2),
+        { 
+            status: 200, 
+            headers: { 'Content-Type': 'application/json' } 
+        }
+    )
+}

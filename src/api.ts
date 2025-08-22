@@ -26,6 +26,11 @@ export async function handle(request: Request, env: Env, ctx: ExecutionContext):
     if (openaiCompat.isOpenAICompatRequest(restResource)) {
         return await handleOpenAICompat(request, env, ctx)
     }
+    
+    // 处理 OpenAI 兼容的模型列表请求
+    if (openaiCompat.isModelsRequest(restResource)) {
+        return await handleModelsRequest(request, env, ctx)
+    }
 
     const realProviderAndModel = await extractRealProviderAndModel(request, restResource, provider)
     if (!realProviderAndModel) {
@@ -519,6 +524,57 @@ async function handleOpenAICompat(request: Request, env: Env, ctx: ExecutionCont
             JSON.stringify({
                 error: {
                     message: 'Failed to process OpenAI compatible request',
+                    type: 'api_error',
+                    code: 'processing_error'
+                }
+            }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
+        )
+    }
+}
+
+async function handleModelsRequest(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    // 检查认证 - OpenAI 兼容格式总是使用 Authorization 头
+    const authKey = getAuthKeyFromHeader(request, 'openai-compat')
+    if (!util.isApiRequestAllowed(authKey, env.AUTH_KEY, 'google-ai-studio', 'gemini-2.0-flash')) {
+        return new Response(
+            JSON.stringify({
+                error: {
+                    message: 'Invalid auth key',
+                    type: 'authentication_error', 
+                    code: 'invalid_api_key'
+                }
+            }),
+            { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
+    }
+
+    // 获取Google AI Studio的活跃密钥
+    const activeKeys = await keyService.listActiveKeysViaCache(env, 'google-ai-studio')
+    if (activeKeys.length === 0) {
+        return new Response(
+            JSON.stringify({
+                error: {
+                    message: 'No active keys available for google-ai-studio',
+                    type: 'api_error',
+                    code: 'no_active_keys'
+                }
+            }),
+            { status: 503, headers: { 'Content-Type': 'application/json' } }
+        )
+    }
+
+    // 随机选择一个API密钥来获取模型列表
+    const randomKey = activeKeys[Math.floor(Math.random() * activeKeys.length)]
+    
+    try {
+        return await openaiCompat.handleModelsRequest(randomKey.key)
+    } catch (error) {
+        console.error('Error in handleModelsRequest:', error)
+        return new Response(
+            JSON.stringify({
+                error: {
+                    message: 'Failed to fetch models',
                     type: 'api_error',
                     code: 'processing_error'
                 }
