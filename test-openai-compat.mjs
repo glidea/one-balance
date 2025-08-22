@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // 测试 OpenAI 兼容格式和中文编码
-// 使用方法: 
+// 使用方法:
 //   WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-secret-key node test-openai-compat.mjs
 // 或者设置环境变量:
 //   export WORKER_URL=https://your-worker.workers.dev
@@ -191,7 +191,10 @@ async function testModelsEndpoint() {
     console.log('✅ 模型列表响应成功')
     console.log('📝 可用模型数量:', data.data?.length || 0)
     if (data.data && data.data.length > 0) {
-        console.log('📋 模型示例:', data.data.slice(0, 3).map(m => m.id))
+        console.log(
+            '📋 模型示例:',
+            data.data.slice(0, 3).map(m => m.id)
+        )
     }
     console.log('📊 响应格式:', data.object)
 
@@ -209,7 +212,9 @@ async function main() {
         console.error('   AUTH_KEY=your-secret-key')
         console.error('')
         console.error('使用方法:')
-        console.error('   WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-secret-key node test-openai-compat.mjs')
+        console.error(
+            '   WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-secret-key node test-openai-compat.mjs'
+        )
         process.exit(1)
     }
 

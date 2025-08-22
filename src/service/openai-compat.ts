@@ -115,7 +115,7 @@ function transformMessages(messages: OpenAIMessage[]): {
 } {
     const contents: GeminiMessage[] = []
     let systemText = ''
-    
+
     // 先收集所有 system 消息
     for (const message of messages) {
         if (message.role === 'system') {
@@ -134,7 +134,7 @@ function transformMessages(messages: OpenAIMessage[]): {
         if (message.role !== 'system') {
             const geminiRole = message.role === 'assistant' ? 'model' : 'user'
             let text = extractTextFromContent(message.content)
-            
+
             // 如果是第一个 user 消息且有 system 文本，则合并
             if (firstUserMessage && geminiRole === 'user' && systemText) {
                 text = `${systemText}\n\n${text}`
@@ -340,13 +340,13 @@ export async function handleModelsRequest(apiKey: string): Promise<Response> {
         const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + apiKey, {
             signal: AbortSignal.timeout(5000) // 5秒超时
         })
-        
+
         if (!response.ok) {
             console.warn('Google AI Studio API returned error, falling back to static list')
             return getFallbackModels()
         }
 
-        const data = await response.json() as any
+        const data = (await response.json()) as any
         const models = data.models || []
 
         // 转换为OpenAI格式的模型列表
@@ -360,13 +360,17 @@ export async function handleModelsRequest(apiKey: string): Promise<Response> {
             }))
 
         return new Response(
-            JSON.stringify({
-                object: 'list',
-                data: openaiModels
-            }, null, 2),
-            { 
-                status: 200, 
-                headers: { 'Content-Type': 'application/json' } 
+            JSON.stringify(
+                {
+                    object: 'list',
+                    data: openaiModels
+                },
+                null,
+                2
+            ),
+            {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
             }
         )
     } catch (error) {
@@ -386,7 +390,7 @@ function getFallbackModels(): Response {
         },
         {
             id: 'gemini-1.5-pro',
-            object: 'model', 
+            object: 'model',
             created: Math.floor(Date.now() / 1000),
             owned_by: 'google'
         },
@@ -405,13 +409,17 @@ function getFallbackModels(): Response {
     ]
 
     return new Response(
-        JSON.stringify({
-            object: 'list',
-            data: fallbackModels
-        }, null, 2),
-        { 
-            status: 200, 
-            headers: { 'Content-Type': 'application/json' } 
+        JSON.stringify(
+            {
+                object: 'list',
+                data: fallbackModels
+            },
+            null,
+            2
+        ),
+        {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
         }
     )
 }

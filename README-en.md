@@ -51,6 +51,22 @@ $env:AUTH_KEY = "your-super-secret-auth-key"; pnpm run deploycf
 
 - The script will guide you to log in to `wrangler` (if you haven't already), automatically create the required D1 database, and deploy the Worker. Upon successful deployment, you will get a Worker URL, for example, `https://one-balance.<your-subdomain>.workers.dev`.
 
+## Management Interface
+
+One Balance provides a beautiful and user-friendly web management interface, built with Apple's design language:
+
+### Login Interface
+
+![Login Interface](images/login-interface.png)
+
+### Provider Selection
+
+![Provider Selection](images/provider-selection.png)
+
+### Key Management
+
+![Key Management](images/key-management.png)
+
 ## Usage
 
 ### 1. Configure Keys for Rotation

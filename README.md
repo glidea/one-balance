@@ -53,6 +53,22 @@ $env:AUTH_KEY = "your-super-secret-auth-key"; pnpm run deploycf
 
 - 脚本将引导你登录 `wrangler` (如果尚未登录)，自动创建所需的 D1 数据库，并部署 Worker。部署成功后，会得到一个 Worker 的 URL，例如 `https://one-balance-backend.<your-subdomain>.workers.dev`。
 
+## 管理界面
+
+One Balance 提供了美观易用的 Web 管理界面，采用 Apple 设计语言打造：
+
+### 登录界面
+
+![登录界面](images/login-interface.png)
+
+### 供应商选择
+
+![供应商选择](images/provider-selection.png)
+
+### 密钥管理
+
+![密钥管理](images/key-management.png)
+
 ## 使用方法
 
 ### 1. 配置待轮询 KEYS

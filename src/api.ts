@@ -21,12 +21,12 @@ export async function handle(request: Request, env: Env, ctx: ExecutionContext):
 
     const provider = restResource.split('/')[0]
     const authKey = getAuthKey(request, provider)
-    
+
     // 处理 OpenAI 兼容格式
     if (openaiCompat.isOpenAICompatRequest(restResource)) {
         return await handleOpenAICompat(request, env, ctx)
     }
-    
+
     // 处理 OpenAI 兼容的模型列表请求
     if (openaiCompat.isModelsRequest(restResource)) {
         return await handleModelsRequest(request, env, ctx)
@@ -403,7 +403,7 @@ async function handleOpenAICompat(request: Request, env: Env, ctx: ExecutionCont
                 JSON.stringify({
                     error: {
                         message: 'Invalid auth key',
-                        type: 'authentication_error', 
+                        type: 'authentication_error',
                         code: 'invalid_api_key'
                     }
                 }),
@@ -541,7 +541,7 @@ async function handleModelsRequest(request: Request, env: Env, ctx: ExecutionCon
             JSON.stringify({
                 error: {
                     message: 'Invalid auth key',
-                    type: 'authentication_error', 
+                    type: 'authentication_error',
                     code: 'invalid_api_key'
                 }
             }),
@@ -566,7 +566,7 @@ async function handleModelsRequest(request: Request, env: Env, ctx: ExecutionCon
 
     // 随机选择一个API密钥来获取模型列表
     const randomKey = activeKeys[Math.floor(Math.random() * activeKeys.length)]
-    
+
     try {
         return await openaiCompat.handleModelsRequest(randomKey.key)
     } catch (error) {

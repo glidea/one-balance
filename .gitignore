@@ -204,7 +204,7 @@ Thumbs.db
 !.env.test
 
 # Vite
-vite.config.js.timestamp-*  
+vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
 # Custom
@@ -219,3 +219,8 @@ key.txt
 
 # Backup files
 *.backup
+
+# ignore claude & etc
+.claude/
+.mcp.json
+.playwright-mcp/

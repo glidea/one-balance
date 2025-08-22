@@ -3,24 +3,84 @@ import * as util from './util'
 import type * as schema from './service/d1/schema'
 
 const PROVIDER_CONFIGS = {
-    'google-ai-studio': { color: 'from-red-400 to-yellow-400', icon: 'G', bgColor: 'from-red-50 to-yellow-50' },
-    'google-vertex-ai': { color: 'from-blue-400 to-green-400', icon: '▲', bgColor: 'from-blue-50 to-green-50' },
-    anthropic: { color: 'from-orange-400 to-red-400', icon: 'A', bgColor: 'from-orange-50 to-red-50' },
-    'azure-openai': { color: 'from-blue-500 to-cyan-400', icon: '⊞', bgColor: 'from-blue-50 to-cyan-50' },
-    'aws-bedrock': { color: 'from-yellow-500 to-orange-500', icon: '◆', bgColor: 'from-yellow-50 to-orange-50' },
-    cartesia: { color: 'from-purple-400 to-pink-400', icon: 'C', bgColor: 'from-purple-50 to-pink-50' },
-    'cerebras': { color: 'from-gray-600 to-gray-800', icon: '◉', bgColor: 'from-gray-50 to-gray-100' },
-    cohere: { color: 'from-green-400 to-teal-500', icon: '●', bgColor: 'from-green-50 to-teal-50' },
-    deepseek: { color: 'from-indigo-500 to-purple-600', icon: '◈', bgColor: 'from-indigo-50 to-purple-50' },
-    elevenlabs: { color: 'from-pink-400 to-rose-500', icon: '♫', bgColor: 'from-pink-50 to-rose-50' },
-    grok: { color: 'from-gray-700 to-black', icon: 'X', bgColor: 'from-gray-50 to-gray-100' },
-    groq: { color: 'from-orange-500 to-red-600', icon: '⚡', bgColor: 'from-orange-50 to-red-50' },
-    huggingface: { color: 'from-yellow-400 to-amber-500', icon: '🤗', bgColor: 'from-yellow-50 to-amber-50' },
-    mistral: { color: 'from-blue-600 to-indigo-700', icon: 'M', bgColor: 'from-blue-50 to-indigo-50' },
-    openai: { color: 'from-emerald-400 to-teal-600', icon: '◯', bgColor: 'from-emerald-50 to-teal-50' },
-    openrouter: { color: 'from-violet-500 to-purple-600', icon: '⟲', bgColor: 'from-violet-50 to-purple-50' },
-    'perplexity-ai': { color: 'from-cyan-500 to-blue-600', icon: '?', bgColor: 'from-cyan-50 to-blue-50' },
-    replicate: { color: 'from-slate-500 to-gray-600', icon: '⧉', bgColor: 'from-slate-50 to-gray-50' }
+    'google-ai-studio': {
+        color: 'from-red-400 to-yellow-400',
+        iconUrl: 'https://ai.google.dev/static/site-assets/images/share.png',
+        bgColor: 'from-red-50 to-yellow-50'
+    },
+    'google-vertex-ai': {
+        color: 'from-blue-400 to-green-400',
+        iconUrl: 'https://cloud.google.com/_static/cloud/images/favicons/onecloud/super_cloud.png',
+        bgColor: 'from-blue-50 to-green-50'
+    },
+    anthropic: {
+        color: 'from-orange-400 to-red-400',
+        iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/7/78/Anthropic_logo.svg',
+        bgColor: 'from-orange-50 to-red-50'
+    },
+    'azure-openai': {
+        color: 'from-blue-500 to-cyan-400',
+        iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg',
+        bgColor: 'from-blue-50 to-cyan-50'
+    },
+    'aws-bedrock': {
+        color: 'from-yellow-500 to-orange-500',
+        iconUrl: 'https://a0.awsstatic.com/libra-css/images/site/fav/favicon.ico',
+        bgColor: 'from-yellow-50 to-orange-50'
+    },
+    cartesia: { color: 'from-purple-400 to-pink-400', iconUrl: '', bgColor: 'from-purple-50 to-pink-50' },
+    cerebras: {
+        color: 'from-gray-600 to-gray-800',
+        iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/15/Cerebras_logo.svg',
+        bgColor: 'from-gray-50 to-gray-100'
+    },
+    cohere: {
+        color: 'from-green-400 to-teal-500',
+        iconUrl: 'https://cohere.com/favicon.ico',
+        bgColor: 'from-green-50 to-teal-50'
+    },
+    deepseek: {
+        color: 'from-indigo-500 to-purple-600',
+        iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/e/ec/DeepSeek_logo.svg',
+        bgColor: 'from-indigo-50 to-purple-50'
+    },
+    elevenlabs: { color: 'from-pink-400 to-rose-500', iconUrl: '', bgColor: 'from-pink-50 to-rose-50' },
+    grok: {
+        color: 'from-gray-700 to-black',
+        iconUrl: 'https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/grok-icon.svg',
+        bgColor: 'from-gray-50 to-gray-100'
+    },
+    groq: {
+        color: 'from-orange-500 to-red-600',
+        iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/c/cc/Groq_logo.svg',
+        bgColor: 'from-orange-50 to-red-50'
+    },
+    huggingface: {
+        color: 'from-yellow-400 to-amber-500',
+        iconUrl: 'https://huggingface.co/favicon.ico',
+        bgColor: 'from-yellow-50 to-amber-50'
+    },
+    mistral: {
+        color: 'from-blue-600 to-indigo-700',
+        iconUrl: 'https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/mistral-ai-icon.svg',
+        bgColor: 'from-blue-50 to-indigo-50'
+    },
+    openai: {
+        color: 'from-emerald-400 to-teal-600',
+        iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/04/ChatGPT_logo.svg',
+        bgColor: 'from-emerald-50 to-teal-50'
+    },
+    openrouter: {
+        color: 'from-violet-500 to-purple-600',
+        iconUrl: 'https://openrouter.ai/favicon.ico',
+        bgColor: 'from-violet-50 to-purple-50'
+    },
+    'perplexity-ai': {
+        color: 'from-cyan-500 to-blue-600',
+        iconUrl: 'https://www.perplexity.ai/favicon.svg',
+        bgColor: 'from-cyan-50 to-blue-50'
+    },
+    replicate: { color: 'from-slate-500 to-gray-600', iconUrl: '', bgColor: 'from-slate-50 to-gray-50' }
 } as const
 
 const PROVIDERS = Object.keys(PROVIDER_CONFIGS)
@@ -31,6 +91,14 @@ export async function handle(request: Request, env: Env, ctx: ExecutionContext):
 
     if (pathname === '/login' && request.method === 'POST') {
         return handleLogin(request, env)
+    }
+
+    if (pathname === '/logout' && request.method === 'POST') {
+        return handleLogout(request)
+    }
+
+    if (pathname === '/login' && request.method === 'GET') {
+        return new Response(loginPage(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } })
     }
 
     if (pathname.startsWith('/keys') || pathname === '/') {
@@ -51,7 +119,17 @@ async function handleLogin(request: Request, env: Env): Promise<Response> {
         return new Response(null, { status: 302, headers })
     }
 
-    return new Response('Invalid key', { status: 403 })
+    // 重定向回登录页面并显示错误信息
+    const headers = new Headers()
+    headers.set('Location', '/login?error=invalid_key')
+    return new Response(null, { status: 302, headers })
+}
+
+async function handleLogout(request: Request): Promise<Response> {
+    const headers = new Headers()
+    headers.set('Set-Cookie', 'auth_key=; HttpOnly; Path=/; SameSite=Strict; Max-Age=0')
+    headers.set('Location', '/login')
+    return new Response(null, { status: 302, headers })
 }
 
 async function handleKeys(request: Request, env: Env): Promise<Response> {
@@ -62,7 +140,7 @@ async function handleKeys(request: Request, env: Env): Promise<Response> {
 
     const parseResult = parseKeysRequest(request)
     if (!parseResult.provider) {
-        return new Response(providersPage(), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } })
+        return new Response(await providersPage(env), { headers: { 'Content-Type': 'text/html;charset=UTF-8' } })
     }
 
     if (request.method === 'POST') {
@@ -180,125 +258,296 @@ function layout(content: string): string {
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚖️</text></svg>">
         <script src="https://cdn.tailwindcss.com"></script>
         <style>
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-                -webkit-font-smoothing: antialiased;
-                -moz-osx-font-smoothing: grayscale;
-            }
-            
-            .breathing-bg {
-                background: linear-gradient(-45deg, #f8fafc, #e2e8f0, #cbd5e1, #f1f5f9);
-                background-size: 400% 400%;
-                animation: breathe 8s ease-in-out infinite;
-            }
-            
-            @keyframes breathe {
-                0%, 100% { background-position: 0% 50%; }
-                50% { background-position: 100% 50%; }
-            }
-            
-            .glass-card {
-                backdrop-filter: blur(24px);
-                -webkit-backdrop-filter: blur(24px);
-                background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.6) 100%);
-                border: 1px solid rgba(255, 255, 255, 0.4);
-                box-shadow: 
-                    0 8px 32px rgba(0, 0, 0, 0.08),
-                    0 4px 16px rgba(0, 0, 0, 0.04),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.6);
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            }
-            
-            .glass-card:hover {
-                transform: translateY(-4px) scale(1.01);
-                box-shadow: 
-                    0 20px 60px rgba(0, 0, 0, 0.12),
-                    0 8px 24px rgba(0, 0, 0, 0.08),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-            }
-            
-            .glass-card-warm {
-                background: linear-gradient(135deg, rgba(254, 249, 239, 0.9) 0%, rgba(255, 251, 235, 0.7) 100%);
-                border: 1px solid rgba(251, 191, 36, 0.2);
-                box-shadow: 
-                    0 8px 32px rgba(251, 191, 36, 0.08),
-                    0 4px 16px rgba(251, 191, 36, 0.04),
-                    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-            }
-            
-            .btn-primary {
-                background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 50%, #2563eb 100%);
-                box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-                position: relative;
-                overflow: hidden;
-            }
-            
-            .btn-primary::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: -100%;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-                transition: left 0.5s;
-            }
-            
-            .btn-primary:hover::before {
-                left: 100%;
-            }
-            
-            .btn-primary:hover {
-                background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%);
-                transform: translateY(-2px);
-                box-shadow: 0 12px 32px rgba(59, 130, 246, 0.4);
-            }
-            
-            .input-field {
-                backdrop-filter: blur(12px);
-                -webkit-backdrop-filter: blur(12px);
-                background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.6) 100%);
-                border: 1px solid rgba(203, 213, 225, 0.4);
-                box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
-                transition: all 0.3s ease;
-            }
-            
-            .input-field:focus {
-                background: rgba(255, 255, 255, 0.95);
-                border-color: #3b82f6;
-                box-shadow: 
-                    0 0 0 3px rgba(59, 130, 246, 0.1),
-                    inset 0 2px 4px rgba(0, 0, 0, 0.02),
-                    0 4px 12px rgba(59, 130, 246, 0.1);
-            }
-            
-            .floating-element {
-                animation: float 6s ease-in-out infinite;
-            }
-            
-            @keyframes float {
-                0%, 100% { transform: translateY(0px); }
-                50% { transform: translateY(-10px); }
-            }
-            
-            .pulse-glow {
-                animation: pulse-glow 3s ease-in-out infinite;
-            }
-            
-            @keyframes pulse-glow {
-                0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.1); }
-                50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.2); }
+            :root {
+                /* Apple System Colors */
+                --color-system-blue: #007AFF;
+                --color-system-green: #34C759;
+                --color-system-red: #FF3B30;
+                --color-system-orange: #FF9500;
+                --color-system-yellow: #FFCC00;
+                --color-system-purple: #AF52DE;
+                --color-system-pink: #FF2D92;
+                --color-system-teal: #64D2FF;
+                --color-system-gray: #8E8E93;
+                --color-system-gray2: #AEAEB2;
+                --color-system-gray3: #C7C7CC;
+                --color-system-gray4: #D1D1D6;
+                --color-system-gray5: #E5E5EA;
+                --color-system-gray6: #F2F2F7;
+                
+                /* Apple Semantic Colors */
+                --color-label: #000000;
+                --color-secondary-label: #3C3C43;
+                --color-tertiary-label: #3C3C43;
+                --color-quaternary-label: #3C3C43;
+                --color-system-background: #FFFFFF;
+                --color-secondary-system-background: #F2F2F7;
+                --color-tertiary-system-background: #FFFFFF;
+                --color-system-fill: #78788033;
+                --color-secondary-system-fill: #78788028;
+                --color-tertiary-system-fill: #7676801E;
+                --color-quaternary-system-fill: #74748014;
+                
+                /* Apple Typography */
+                --font-weight-ultralight: 100;
+                --font-weight-thin: 200;
+                --font-weight-light: 300;
+                --font-weight-regular: 400;
+                --font-weight-medium: 500;
+                --font-weight-semibold: 600;
+                --font-weight-bold: 700;
+                --font-weight-heavy: 800;
+                --font-weight-black: 900;
+                
+                /* Apple Spacing (8pt grid) */
+                --spacing-xs: 4px;
+                --spacing-sm: 8px;
+                --spacing-md: 16px;
+                --spacing-lg: 24px;
+                --spacing-xl: 32px;
+                --spacing-2xl: 40px;
+                --spacing-3xl: 48px;
+                
+                /* Apple Corner Radius */
+                --radius-xs: 4px;
+                --radius-sm: 6px;
+                --radius-md: 8px;
+                --radius-lg: 12px;
+                --radius-xl: 16px;
+                --radius-2xl: 20px;
+                --radius-3xl: 24px;
             }
 
-            .copy-success {
-                animation: copy-flash 0.6s ease-out;
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+                -webkit-font-smoothing: antialiased;
+                -moz-osx-font-smoothing: grayscale;
+                background: var(--color-system-gray6);
+                color: var(--color-label);
+                line-height: 1.47059; /* Apple's standard line height */
+                letter-spacing: -0.022em; /* Apple's standard letter spacing */
             }
             
-            @keyframes copy-flash {
-                0% { background-color: rgba(34, 197, 94, 0.1); }
-                50% { background-color: rgba(34, 197, 94, 0.2); }
+            .apple-card {
+                background: var(--color-system-background);
+                border-radius: var(--radius-xl);
+                border: 0.5px solid var(--color-system-gray5);
+                box-shadow: 
+                    0 1px 3px rgba(0, 0, 0, 0.1),
+                    0 1px 2px rgba(0, 0, 0, 0.06);
+                transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            }
+            
+            .apple-card:hover {
+                transform: translateY(-1px);
+                box-shadow: 
+                    0 4px 12px rgba(0, 0, 0, 0.15),
+                    0 2px 6px rgba(0, 0, 0, 0.1);
+            }
+            
+            .apple-card-warm {
+                background: var(--color-tertiary-system-background);
+                border: 0.5px solid var(--color-system-gray4);
+                border-radius: var(--radius-xl);
+                box-shadow: 
+                    0 1px 3px rgba(0, 0, 0, 0.1),
+                    0 1px 2px rgba(0, 0, 0, 0.06);
+            }
+            
+            .apple-btn-primary {
+                background: var(--color-system-blue);
+                color: white;
+                border: none;
+                border-radius: var(--radius-md);
+                font-weight: var(--font-weight-semibold);
+                font-size: 17px; /* Apple's standard button font size */
+                line-height: 1.29412;
+                letter-spacing: -0.022em;
+                transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                box-shadow: 
+                    0 1px 3px rgba(0, 122, 255, 0.3),
+                    0 1px 2px rgba(0, 122, 255, 0.2);
+            }
+            
+            .apple-btn-primary:hover {
+                background: #0056b3; /* Darker blue on hover */
+                transform: translateY(-0.5px);
+                box-shadow: 
+                    0 2px 6px rgba(0, 122, 255, 0.4),
+                    0 1px 3px rgba(0, 122, 255, 0.3);
+            }
+
+            .apple-btn-primary:active {
+                transform: translateY(0);
+                background: #004494;
+                box-shadow: 
+                    0 1px 2px rgba(0, 122, 255, 0.3);
+            }
+
+            .apple-btn-secondary {
+                background: var(--color-secondary-system-background);
+                color: var(--color-system-blue);
+                border: 0.5px solid var(--color-system-gray4);
+                border-radius: var(--radius-md);
+                font-weight: var(--font-weight-semibold);
+                font-size: 17px;
+                line-height: 1.29412;
+                letter-spacing: -0.022em;
+                transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                box-shadow: 
+                    0 1px 3px rgba(0, 0, 0, 0.1),
+                    0 1px 2px rgba(0, 0, 0, 0.06);
+            }
+
+            .apple-btn-secondary:hover {
+                background: var(--color-system-gray6);
+                transform: translateY(-0.5px);
+                box-shadow: 
+                    0 2px 6px rgba(0, 0, 0, 0.15),
+                    0 1px 3px rgba(0, 0, 0, 0.1);
+            }
+
+            .apple-btn-destructive {
+                background: var(--color-system-red);
+                color: white;
+                border: none;
+                border-radius: var(--radius-md);
+                font-weight: var(--font-weight-semibold);
+                font-size: 17px;
+                line-height: 1.29412;
+                letter-spacing: -0.022em;
+                transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                box-shadow: 
+                    0 1px 3px rgba(255, 59, 48, 0.3),
+                    0 1px 2px rgba(255, 59, 48, 0.2);
+            }
+
+            .apple-btn-destructive:hover {
+                background: #d70015;
+                transform: translateY(-0.5px);
+                box-shadow: 
+                    0 2px 6px rgba(255, 59, 48, 0.4),
+                    0 1px 3px rgba(255, 59, 48, 0.3);
+            }
+            
+            .apple-input {
+                background: var(--color-system-background);
+                border: 0.5px solid var(--color-system-gray4);
+                border-radius: var(--radius-md);
+                color: var(--color-label);
+                font-size: 17px;
+                line-height: 1.29412;
+                letter-spacing: -0.022em;
+                transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                box-shadow: 
+                    0 1px 3px rgba(0, 0, 0, 0.1),
+                    0 1px 2px rgba(0, 0, 0, 0.06);
+            }
+            
+            .apple-input:focus {
+                background: var(--color-system-background);
+                border-color: var(--color-system-blue);
+                box-shadow: 
+                    0 0 0 3px rgba(0, 122, 255, 0.1),
+                    0 1px 3px rgba(0, 0, 0, 0.1),
+                    0 1px 2px rgba(0, 0, 0, 0.06);
+                outline: none;
+            }
+
+            .apple-input::placeholder {
+                color: var(--color-tertiary-label);
+            }
+            
+            .apple-table {
+                background: var(--color-system-background);
+                border-radius: var(--radius-xl);
+                border: 0.5px solid var(--color-system-gray5);
+                overflow: hidden;
+            }
+
+            .apple-table th {
+                background: var(--color-secondary-system-background);
+                color: var(--color-secondary-label);
+                font-size: 13px;
+                font-weight: var(--font-weight-semibold);
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+                border-bottom: 0.5px solid var(--color-system-gray5);
+                padding: var(--spacing-md);
+            }
+
+            .apple-table td {
+                padding: var(--spacing-md);
+                border-bottom: 0.5px solid var(--color-system-gray5);
+                font-size: 15px;
+                color: var(--color-label);
+            }
+
+            .apple-table tr:hover {
+                background: var(--color-quaternary-system-fill);
+            }
+
+            .apple-table tr:last-child td {
+                border-bottom: none;
+            }
+
+            .apple-tag {
+                display: inline-flex;
+                align-items: center;
+                padding: var(--spacing-xs) var(--spacing-sm);
+                background: var(--color-secondary-system-fill);
+                color: var(--color-secondary-label);
+                border-radius: var(--radius-sm);
+                font-size: 12px;
+                font-weight: var(--font-weight-medium);
+                border: 0.5px solid var(--color-system-gray4);
+            }
+
+            .apple-tag-success {
+                background: rgba(52, 199, 89, 0.1);
+                color: var(--color-system-green);
+                border-color: rgba(52, 199, 89, 0.2);
+            }
+
+            .apple-tag-warning {
+                background: rgba(255, 204, 0, 0.1);
+                color: var(--color-system-yellow);
+                border-color: rgba(255, 204, 0, 0.2);
+            }
+
+            .apple-tag-error {
+                background: rgba(255, 59, 48, 0.1);
+                color: var(--color-system-red);
+                border-color: rgba(255, 59, 48, 0.2);
+            }
+
+            .apple-subtle-animation {
+                animation: subtle-float 4s ease-in-out infinite;
+            }
+            
+            @keyframes subtle-float {
+                0%, 100% { transform: translateY(0px); }
+                50% { transform: translateY(-2px); }
+            }
+
+            .apple-copy-feedback {
+                animation: copy-success 0.4s ease-out;
+            }
+            
+            @keyframes copy-success {
+                0% { background-color: rgba(52, 199, 89, 0.1); }
                 100% { background-color: transparent; }
+            }
+
+            @keyframes pulse-glow {
+                0%, 100% { 
+                    opacity: 0;
+                    transform: scale(0.95);
+                }
+                50% { 
+                    opacity: 0.6;
+                    transform: scale(1.05);
+                }
             }
         </style>
         <script>
@@ -322,19 +571,19 @@ function layout(content: string): string {
             }
         </script>
     </head>
-    <body class="breathing-bg min-h-screen text-gray-900 flex flex-col">
-        <main class="container mx-auto mt-12 px-6 max-w-7xl flex-grow">
+    <body class="min-h-screen flex flex-col">
+        <main style="padding: var(--spacing-3xl) var(--spacing-lg); max-width: 1400px; margin: 0 auto; flex-grow: 1;">
             ${content}
         </main>
-        <footer class="text-center py-12 text-sm text-gray-600 space-y-3">
-            <p>
-                <a href="https://github.com/glidea/one-balance" target="_blank" rel="noopener noreferrer" class="hover:text-blue-600 transition-colors duration-300 font-medium">
+        <footer style="text-align: center; padding: var(--spacing-3xl) var(--spacing-lg); color: var(--color-secondary-label); font-size: 13px; line-height: 1.38462; border-top: 0.5px solid var(--color-system-gray5);">
+            <p style="margin-bottom: var(--spacing-sm);">
+                <a href="https://github.com/glidea/one-balance" target="_blank" rel="noopener noreferrer" style="color: var(--color-system-blue); text-decoration: none; font-weight: var(--font-weight-medium); transition: opacity 0.2s ease;">
                     one-balance on GitHub
                 </a>
             </p>
             <p>
-                <a href="https://github.com/glidea/zenfeed" target="_blank" rel="noopener noreferrer" class="hover:text-blue-600 transition-colors duration-300 font-medium">
-                    zenfeed &mdash; Make RSS 📰 great again with AI 🧠✨!!
+                <a href="https://github.com/glidea/zenfeed" target="_blank" rel="noopener noreferrer" style="color: var(--color-system-blue); text-decoration: none; font-weight: var(--font-weight-medium); transition: opacity 0.2s ease;">
+                    zenfeed — Make RSS 📰 great again with AI 🧠✨!!
                 </a>
             </p>
         </footer>
@@ -345,61 +594,208 @@ function layout(content: string): string {
 
 function loginPage(): string {
     const content = `
-    <div class="flex items-center justify-center min-h-[70vh] relative">
-        <div class="absolute top-20 left-1/4 w-32 h-32 bg-blue-200/30 rounded-full blur-3xl floating-element"></div>
-        <div class="absolute bottom-20 right-1/4 w-40 h-40 bg-amber-200/30 rounded-full blur-3xl floating-element" style="animation-delay: -3s;"></div>
+    <div style="position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: var(--spacing-lg); background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);">
+        <!-- 背景装饰元素 -->
+        <div style="position: absolute; top: 10%; left: 10%; width: 200px; height: 200px; background: linear-gradient(45deg, rgba(0, 122, 255, 0.1), rgba(52, 199, 89, 0.1)); border-radius: 50%; filter: blur(40px); animation: float 6s ease-in-out infinite;"></div>
+        <div style="position: absolute; bottom: 10%; right: 15%; width: 300px; height: 300px; background: linear-gradient(45deg, rgba(255, 59, 48, 0.08), rgba(255, 204, 0, 0.08)); border-radius: 50%; filter: blur(50px); animation: float 8s ease-in-out infinite reverse;"></div>
         
-        <div class="max-w-md w-full mx-6 relative z-10">
-            <div class="text-center mb-16">
-                <div class="pulse-glow inline-block p-6 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-3xl mb-6">
-                    <h1 class="text-6xl font-bold">⚖️</h1>
-                </div>
-                <h2 class="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-3">One Balance</h2>
-                <p class="text-gray-600 text-lg">Manage your API keys with perfect balance</p>
-            </div>
-            
-            <div class="glass-card-warm rounded-3xl p-10 transition-all duration-500 hover:scale-[1.02]">
-                <form action="/login" method="POST" class="space-y-8">
-                    <div>
-                        <label for="auth_key" class="block text-gray-800 text-sm font-bold mb-4 tracking-wide">Authentication Key</label>
-                        <input type="password" id="auth_key" name="auth_key" 
-                               class="input-field w-full px-5 py-4 rounded-2xl text-gray-900 placeholder-gray-500 focus:outline-none text-base font-medium" 
-                               placeholder="Enter your auth key" required>
+        <div style="max-width: 1000px; width: 100%; position: relative; z-index: 10;">
+            <!-- 宽屏登录卡片 -->
+            <div style="background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: var(--radius-3xl); overflow: hidden; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1), 0 8px 32px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);">
+                <div style="display: grid; grid-template-columns: 1fr 1px 1fr; min-height: 500px;">
+                    <!-- 左侧：品牌展示区域 -->
+                    <div style="padding: var(--spacing-3xl); display: flex; flex-direction: column; justify-content: center; align-items: center; background: linear-gradient(135deg, rgba(0, 122, 255, 0.05), rgba(88, 86, 214, 0.05));">
+                        <div class="login-logo" style="margin-bottom: var(--spacing-xl);">
+                            <div style="width: 120px; height: 120px; background: linear-gradient(135deg, var(--color-system-blue), #5856D6); border-radius: var(--radius-3xl); display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 40px rgba(0, 122, 255, 0.3); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
+                                <div style="font-size: 56px; line-height: 1; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));">⚖️</div>
+                            </div>
+                        </div>
+                        <h1 style="font-size: 48px; font-weight: var(--font-weight-bold); background: linear-gradient(135deg, var(--color-label), var(--color-secondary-label)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: var(--spacing-lg); line-height: 1.11111; letter-spacing: -0.02em; text-align: center;">One Balance</h1>
+                        <p style="color: var(--color-secondary-label); font-size: 20px; line-height: 1.47; letter-spacing: -0.022em; text-align: center; margin-bottom: var(--spacing-xl); font-weight: var(--font-weight-medium);">智能管理您的 API 密钥<br>完美平衡负载</p>
+                        
+                        <!-- 特性列表 -->
+                        <div style="display: flex; flex-direction: column; gap: var(--spacing-md); width: 100%; max-width: 320px;">
+                            <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                                <div style="width: 8px; height: 8px; background: var(--color-system-blue); border-radius: 50%;"></div>
+                                <span style="color: var(--color-secondary-label); font-size: 16px; font-weight: var(--font-weight-medium);">多提供商支持</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                                <div style="width: 8px; height: 8px; background: var(--color-system-green); border-radius: 50%;"></div>
+                                <span style="color: var(--color-secondary-label); font-size: 16px; font-weight: var(--font-weight-medium);">智能负载均衡</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                                <div style="width: 8px; height: 8px; background: var(--color-system-purple); border-radius: 50%;"></div>
+                                <span style="color: var(--color-secondary-label); font-size: 16px; font-weight: var(--font-weight-medium);">实时状态监控</span>
+                            </div>
+                        </div>
                     </div>
-                    <button type="submit" class="btn-primary w-full py-4 px-6 text-white font-bold rounded-2xl focus:outline-none focus:ring-4 focus:ring-blue-200 text-base tracking-wide">
-                        Sign In
-                    </button>
-                </form>
+                    
+                    <!-- 分隔线 -->
+                    <div style="background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.1), transparent);"></div>
+                    
+                    <!-- 右侧：登录表单区域 -->
+                    <div style="padding: var(--spacing-lg) var(--spacing-3xl); display: flex; flex-direction: column; justify-content: center;">
+                        <div style="max-width: 600px; margin: 0 auto; width: 100%;">
+                            <h2 style="font-size: 32px; font-weight: var(--font-weight-bold); color: var(--color-label); margin-bottom: var(--spacing-sm); text-align: center;">欢迎回来</h2>
+                            <p style="color: var(--color-secondary-label); font-size: 17px; text-align: center; margin-bottom: var(--spacing-3xl);">请输入您的认证密钥以继续</p>
+                            
+                            <!-- 错误提示区域 -->
+                            <div id="error-message" style="display: none; background: rgba(255, 59, 48, 0.1); border: 1px solid rgba(255, 59, 48, 0.2); border-radius: var(--radius-lg); padding: var(--spacing-md); margin-bottom: var(--spacing-lg);">
+                                <div style="display: flex; align-items: center; gap: var(--spacing-sm);">
+                                    <svg style="width: 20px; height: 20px; color: var(--color-system-red); flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 18.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                                    </svg>
+                                    <span style="color: var(--color-system-red); font-size: 15px; font-weight: var(--font-weight-medium);" id="error-text">认证密钥无效，请检查后重试</span>
+                                </div>
+                            </div>
+                            
+                            <form action="/login" method="POST" style="display: flex; flex-direction: column; gap: var(--spacing-xl);" onsubmit="handleFormSubmit(event)">
+                                <div style="position: relative;">
+                                    <label for="auth_key" style="display: block; color: var(--color-label); font-size: 17px; font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-md); line-height: 1.4; letter-spacing: -0.022em;">认证密钥</label>
+                                    <div style="position: relative;">
+                                        <div style="position: absolute; left: var(--spacing-lg); top: 50%; transform: translateY(-50%); z-index: 2;">
+                                            <svg style="width: 20px; height: 20px; color: var(--color-tertiary-label);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-3.586l6.586-6.586A6 6 0 0121 9z"></path>
+                                            </svg>
+                                        </div>
+                                        <input type="password" id="auth_key" name="auth_key" 
+                                               class="login-input" 
+                                               style="width: 100%; padding: var(--spacing-xl) var(--spacing-xl) var(--spacing-xl) 52px; font-size: 15px; border-radius: var(--radius-xl); border: 1.5px solid var(--color-system-gray4); background: var(--color-system-background); transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); font-weight: var(--font-weight-medium); font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Fira Mono', 'Droid Sans Mono', 'Consolas', monospace; letter-spacing: 0.3px; min-height: 56px;"
+                                               placeholder="sk-1234567890abcdefghijklmnopqrstuvwxyz12345" 
+                                               required
+                                               onfocus="clearError(); this.style.borderColor='var(--color-system-blue)'; this.style.boxShadow='0 0 0 4px rgba(0, 122, 255, 0.1), 0 4px 16px rgba(0, 0, 0, 0.1)'"
+                                               onblur="this.style.borderColor='var(--color-system-gray4)'; this.style.boxShadow='0 2px 8px rgba(0, 0, 0, 0.06)'">
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" id="signin-btn" style="width: 100%; padding: var(--spacing-lg) var(--spacing-xl); font-size: 17px; font-weight: var(--font-weight-semibold); border-radius: var(--radius-xl); background: linear-gradient(135deg, var(--color-system-blue), #5856D6); color: white; border: none; box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3), 0 2px 8px rgba(0, 122, 255, 0.2); transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); position: relative; overflow: hidden;" 
+                                        onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 6px 20px rgba(0, 122, 255, 0.4), 0 4px 12px rgba(0, 122, 255, 0.3)'"
+                                        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 16px rgba(0, 122, 255, 0.3), 0 2px 8px rgba(0, 122, 255, 0.2)'"
+                                        onmousedown="this.style.transform='translateY(0)'"
+                                        onmouseup="this.style.transform='translateY(-1px)'">
+                                    <span id="btn-text">登录</span>
+                                    <div id="btn-loading" style="display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);">
+                                        <div style="width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 1s linear infinite;"></div>
+                                    </div>
+                                </button>
+                            </form>
+                            
+                            <!-- 底部提示 -->
+                            <div style="text-align: center; margin-top: var(--spacing-xl); padding-top: var(--spacing-xl); border-top: 1px solid rgba(0, 0, 0, 0.06);">
+                                <p style="color: var(--color-tertiary-label); font-size: 14px; margin: 0; font-weight: var(--font-weight-medium);">
+                                    安全可靠的 API 密钥管理平台
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+    
+    <style>
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .login-logo {
+            animation: gentle-pulse 4s ease-in-out infinite;
+        }
+        
+        @keyframes gentle-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .login-input:focus::placeholder {
+            opacity: 0.5;
+            transform: translateX(5px);
+            transition: all 0.3s ease;
+        }
+    </style>
+    
+    <script>
+        function handleFormSubmit(event) {
+            const btn = document.getElementById('signin-btn');
+            const btnText = document.getElementById('btn-text');
+            const btnLoading = document.getElementById('btn-loading');
+            
+            clearError();
+            btnText.style.display = 'none';
+            btnLoading.style.display = 'block';
+            btn.disabled = true;
+            btn.style.opacity = '0.9';
+        }
+        
+        function showError(message) {
+            const errorElement = document.getElementById('error-message');
+            const errorText = document.getElementById('error-text');
+            if (errorElement && errorText) {
+                errorText.textContent = message;
+                errorElement.style.display = 'block';
+                errorElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+        
+        function clearError() {
+            const errorElement = document.getElementById('error-message');
+            if (errorElement) {
+                errorElement.style.display = 'none';
+            }
+        }
+        
+        // 检查URL参数显示错误信息
+        window.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const error = urlParams.get('error');
+            if (error === 'invalid_key') {
+                showError('认证密钥无效，请检查后重试');
+            }
+        });
+    </script>
     `
     return layout(content)
 }
 
-function providersPage(): string {
-    const providerLinks = PROVIDERS.map((p, index) => {
-        const config = PROVIDER_CONFIGS[p as keyof typeof PROVIDER_CONFIGS]
-        return `
-            <div class="glass-card rounded-3xl p-8 transition-all duration-500 hover:cursor-pointer group hover:shadow-2xl" style="animation-delay: ${index * 0.1}s;">
-                <a href="/keys/${p}?status=active" class="block">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-5">
-                            <div class="relative">
-                                <div class="w-14 h-14 bg-gradient-to-br ${config.bgColor} rounded-2xl flex items-center justify-center group-hover:scale-110 transition-all duration-300 shadow-lg">
-                                    <div class="w-8 h-8 bg-gradient-to-br ${config.color} rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-inner">
-                                        ${config.icon}
+async function providersPage(env: Env): Promise<string> {
+    const providerLinks = await Promise.all(
+        PROVIDERS.map(async (p, index) => {
+            const config = PROVIDER_CONFIGS[p as keyof typeof PROVIDER_CONFIGS]
+
+            // 检查该供应商是否有可用密钥
+            const { keys } = await keyService.listKeys(env, p, 'active', '', 1, 1, '', '')
+            const hasActiveKeys = keys.length > 0
+            const statusColor = hasActiveKeys ? 'var(--color-system-green)' : 'var(--color-system-gray)'
+            const statusOpacity = hasActiveKeys ? '1' : '0.6'
+
+            return `
+            <div class="apple-card group" style="padding: var(--spacing-lg); cursor: pointer;">
+                <a href="/keys/${p}?status=active" style="display: block; text-decoration: none; color: inherit;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                            <div style="position: relative;">
+                                <div style="width: 56px; height: 56px; background: var(--color-secondary-system-background); border-radius: var(--radius-xl); display: flex; align-items: center; justify-content: center; border: ${hasActiveKeys ? '2px solid var(--color-system-green)' : '0.5px solid var(--color-system-gray4)'}; transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94); overflow: hidden; ${hasActiveKeys ? 'box-shadow: 0 0 0 2px rgba(52, 199, 89, 0.2), 0 4px 16px rgba(52, 199, 89, 0.3);' : 'box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);'}">
+                                    <img src="${config.iconUrl}" alt="${p} icon" style="width: 32px; height: 32px; object-fit: contain;" 
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                    <div style="width: 32px; height: 32px; background: var(--color-system-blue); border-radius: var(--radius-md); display: none; align-items: center; justify-content: center; color: white; font-weight: var(--font-weight-bold); font-size: 14px;">
+                                        ${p.charAt(0).toUpperCase()}
                                     </div>
                                 </div>
-                                <div class="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br ${config.color} rounded-full opacity-60 group-hover:opacity-100 transition-opacity duration-300"></div>
+                                <!-- 状态脉冲动画（仅在有密钥时显示） -->
+                                ${hasActiveKeys ? `<div style="position: absolute; inset: -6px; border-radius: var(--radius-xl); background: linear-gradient(135deg, rgba(52, 199, 89, 0.4), rgba(52, 199, 89, 0.2)); opacity: 0; animation: pulse-glow 2s ease-in-out infinite; z-index: -1;"></div>` : ''}
                             </div>
                             <div>
-                                <h3 class="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors duration-300 mb-1">${p}</h3>
+                                <h3 style="font-size: 17px; font-weight: var(--font-weight-semibold); color: var(--color-label); margin: 0; line-height: 1.29412; letter-spacing: -0.022em;">${p}</h3>
                             </div>
                         </div>
-                        <div class="flex items-center space-x-2">
-                            <div class="w-2 h-2 bg-gradient-to-r ${config.color} rounded-full opacity-60 group-hover:opacity-100 transition-opacity duration-300"></div>
-                            <svg class="w-6 h-6 text-gray-400 transform transition-all duration-300 group-hover:translate-x-2 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div style="display: flex; align-items: center; gap: var(--spacing-md);">
+                            <svg style="width: 20px; height: 20px; color: var(--color-secondary-label); transition: all 0.2s ease;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                             </svg>
                         </div>
@@ -407,16 +803,31 @@ function providersPage(): string {
                 </a>
             </div>
         `
-    }).join('')
+        })
+    )
+
+    const providerLinksHtml = providerLinks.join('')
 
     const content = `
-        <div class="text-center mb-20 relative">
-            <div class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-8 w-64 h-32 bg-gradient-to-r from-blue-200/20 to-purple-200/20 rounded-full blur-3xl"></div>
-            <h1 class="text-6xl font-bold bg-gradient-to-r from-gray-900 via-blue-800 to-gray-900 bg-clip-text text-transparent mb-6 relative">Select Provider</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-3xl);">
+            <div style="flex: 1;"></div>
+            <div style="text-align: center; flex: 1;">
+                <h1 style="font-size: 34px; font-weight: var(--font-weight-bold); color: var(--color-label); margin: 0; line-height: 1.17647; letter-spacing: 0.007em;">Select Provider</h1>
+            </div>
+            <div style="flex: 1; display: flex; justify-content: flex-end;">
+                <form action="/logout" method="POST" style="display: inline;">
+                    <button type="submit" class="apple-btn-secondary" style="padding: var(--spacing-sm) var(--spacing-md); font-size: 15px; display: flex; align-items: center; gap: var(--spacing-xs);">
+                        <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                        </svg>
+                        退出登录
+                    </button>
+                </form>
+            </div>
         </div>
         
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 max-w-7xl mx-auto">
-            ${providerLinks}
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--spacing-md); max-width: 1200px; margin: 0 auto;">
+            ${providerLinksHtml}
         </div>
     `
     return layout(content)
@@ -446,14 +857,24 @@ function keysListPage(
 
 function buildBreadcrumb(provider: string): string {
     return `
-        <div class="mb-8">
-            <nav class="flex items-center space-x-2 text-sm text-gray-600 mb-4">
-                <a href="/" class="hover:text-blue-600 transition-colors duration-200 font-medium">Providers</a>
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                </svg>
-                <span class="text-gray-900 font-semibold">${provider}</span>
-            </nav>
+        <div style="margin-bottom: var(--spacing-lg);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <nav style="display: flex; align-items: center; gap: var(--spacing-sm); font-size: 15px;">
+                    <a href="/" style="color: var(--color-system-blue); text-decoration: none; font-weight: var(--font-weight-medium); transition: opacity 0.2s ease;">Providers</a>
+                    <svg style="width: 16px; height: 16px; color: var(--color-tertiary-label);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                    <span style="color: var(--color-label); font-weight: var(--font-weight-semibold);">${provider}</span>
+                </nav>
+                <form action="/logout" method="POST" style="display: inline;">
+                    <button type="submit" class="apple-btn-secondary" style="padding: var(--spacing-sm) var(--spacing-md); font-size: 15px; display: flex; align-items: center; gap: var(--spacing-xs);">
+                        <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                        </svg>
+                        退出登录
+                    </button>
+                </form>
+            </div>
         </div>
     `
 }
@@ -483,7 +904,7 @@ function buildKeysTable(
     )
 
     return `
-        <div class="glass-card bg-white/80 rounded-3xl shadow-xl border border-gray-200 overflow-hidden mb-8 max-w-5xl mx-auto backdrop-blur-xl">
+        <div class="apple-card" style="overflow: hidden; margin-bottom: var(--spacing-lg); max-width: 1200px; margin-left: auto; margin-right: auto;">
             <form method="POST">
                 ${buildTableHeader(provider, currentStatus, q, statusTabs, sortBy, sortOrder)}
                 ${buildTableContent(keyRows, provider, currentStatus, q, sortBy, sortOrder)}
@@ -505,11 +926,11 @@ function buildStatusTabs(
     return statuses
         .map(s => {
             const isActive = s === currentStatus
-            const activeClasses = isActive
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 border border-blue-600'
-                : 'bg-white/80 text-gray-800 hover:bg-white border border-gray-300 hover:border-gray-400'
+            const activeStyles = isActive
+                ? 'background: var(--color-system-blue); color: white; border: none;'
+                : 'background: var(--color-secondary-system-background); color: var(--color-label); border: 0.5px solid var(--color-system-gray4);'
             const link = buildPageLink(provider, s, q, 1, 20, sortBy, sortOrder)
-            return `<a href="${link}" class="px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${activeClasses}">${s.charAt(0).toUpperCase() + s.slice(1)}</a>`
+            return `<a href="${link}" style="padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-md); font-size: 15px; font-weight: var(--font-weight-semibold); text-decoration: none; transition: all 0.2s ease; ${activeStyles}">${s.charAt(0).toUpperCase() + s.slice(1)}</a>`
         })
         .join('')
 }
@@ -526,21 +947,23 @@ function buildKeyRows(keys: schema.Key[]): string {
             const modelCoolingsJson = JSON.stringify(k.modelCoolings || {}).replace(/"/g, '&quot;')
 
             return `
-            <tr class="group hover:bg-blue-100/60 even:bg-slate-100/40 odd:bg-white/60 transition-all duration-300 hover:shadow-md backdrop-blur-sm border-b border-gray-300/50">
-                <td class="p-4">
+            <tr style="border-bottom: 0.5px solid var(--color-system-gray5); transition: background-color 0.2s ease;" onmouseover="this.style.backgroundColor='var(--color-quaternary-system-fill)'" onmouseout="this.style.backgroundColor='transparent'">
+                <td style="padding: var(--spacing-md);">
                     <input type="checkbox" name="key_id" value="${k.id}" 
-                           class="h-4 w-4 text-blue-600 bg-white border-gray-500 rounded focus:ring-blue-500 focus:ring-2 transition-colors backdrop-blur-sm">
+                           style="width: 16px; height: 16px; accent-color: var(--color-system-blue); border-radius: var(--radius-xs);">
                 </td>
-                <td class="p-4">
+                <td style="padding: var(--spacing-md);">
                     ${buildCopyableKey(k.key)}
                 </td>
-                <td class="p-4 text-sm text-slate-700 font-medium">${k.remark || ''}</td>
-                <td class="p-4">
-                    <span class="text-sm text-slate-800 cursor-pointer hover:text-blue-700 transition-colors duration-200 font-medium px-2 py-1 rounded-md hover:bg-blue-100/80 backdrop-blur-sm" 
+                <td style="padding: var(--spacing-md); font-size: 15px; color: var(--color-label); font-weight: var(--font-weight-medium);">${k.remark || ''}</td>
+                <td style="padding: var(--spacing-md);">
+                    <span style="font-size: 15px; color: var(--color-system-blue); cursor: pointer; font-weight: var(--font-weight-medium); padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--radius-sm); transition: background-color 0.2s ease;" 
                           onclick="showModelCoolings('${modelCoolingsJson}', '${k.key.substring(0, 20)}...')"
+                          onmouseover="this.style.backgroundColor='var(--color-secondary-system-fill)'"
+                          onmouseout="this.style.backgroundColor='transparent'"
                           title="Click to view model cooling details">${totalCoolingTime}</span>
                 </td>
-                <td class="p-4 text-sm text-slate-700 font-medium">${usedTime}</td>
+                <td style="padding: var(--spacing-md); font-size: 15px; color: var(--color-secondary-label); font-weight: var(--font-weight-medium);">${usedTime}</td>
             </tr>
         `
         })
@@ -550,12 +973,12 @@ function buildKeyRows(keys: schema.Key[]): string {
 function buildEmptyState(): string {
     return `
         <tr>
-            <td colspan="4" class="text-center p-12 text-gray-700 bg-slate-100/40 backdrop-blur-sm">
-                <div class="flex flex-col items-center gap-3">
-                    <svg class="w-12 h-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <td colspan="5" style="text-align: center; padding: var(--spacing-3xl); color: var(--color-secondary-label); background: var(--color-secondary-system-background);">
+                <div style="display: flex; flex-direction: column; align-items: center; gap: var(--spacing-md);">
+                    <svg style="width: 48px; height: 48px; color: var(--color-tertiary-label);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
                     </svg>
-                    <p class="font-medium">No keys found</p>
+                    <p style="font-weight: var(--font-weight-medium); font-size: 17px;">No keys found</p>
                 </div>
             </td>
         </tr>
@@ -565,13 +988,15 @@ function buildEmptyState(): string {
 function buildCopyableKey(key: string): string {
     const displayKey = `${key.substring(0, 4)}...${key.substring(key.length - 4)}`
     return `
-        <div class="relative inline-block">
-            <code class="px-3 py-2 bg-slate-200/80 border border-slate-300/70 rounded-lg text-sm font-mono text-slate-900 cursor-pointer hover:bg-slate-300/80 hover:border-slate-400/70 transition-all duration-200 inline-block group-hover:shadow-sm backdrop-blur-sm"
+        <div style="position: relative; display: inline-block;">
+            <code style="padding: var(--spacing-sm) var(--spacing-md); background: var(--color-secondary-system-background); border: 0.5px solid var(--color-system-gray4); border-radius: var(--radius-md); font-size: 13px; font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Fira Mono', 'Droid Sans Mono', 'Consolas', monospace; color: var(--color-label); cursor: pointer; transition: all 0.2s ease; display: inline-block;"
                   onclick="copyToClipboard('${key.replace(/'/g, "\\'")}', this)"
+                  onmouseover="this.style.backgroundColor='var(--color-tertiary-system-fill)'"
+                  onmouseout="this.style.backgroundColor='var(--color-secondary-system-background)'"
                   title="Click to copy">
-                <span class="font-mono">${displayKey}</span>
+                <span style="font-family: inherit;">${displayKey}</span>
             </code>
-            <div class="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-emerald-700 text-white text-xs px-2 py-1 rounded opacity-0 pointer-events-none transition-opacity duration-300 whitespace-nowrap copy-tooltip backdrop-blur-sm">
+            <div style="position: absolute; top: -32px; left: 50%; transform: translateX(-50%); background: var(--color-system-green); color: white; font-size: 12px; padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--radius-sm); opacity: 0; pointer-events: none; transition: opacity 0.3s ease; white-space: nowrap;" class="copy-tooltip">
                 Copied!
             </div>
         </div>
@@ -651,15 +1076,17 @@ function buildPaginationButton(
 
     const link = buildPageLink(provider, status, q, targetPage, 20, sortBy, sortOrder)
 
-    const baseClasses = 'p-2 rounded-lg text-sm font-medium transition-all duration-200'
-    const disabledClasses = 'bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300 pointer-events-none'
-    const enabledClasses =
-        'bg-white text-gray-800 hover:bg-gray-50 border border-gray-300 hover:border-gray-400 shadow-sm'
+    const baseStyles =
+        'padding: var(--spacing-sm); border-radius: var(--radius-md); font-size: 15px; font-weight: var(--font-weight-medium); transition: all 0.2s ease; text-decoration: none; display: inline-flex; align-items: center; justify-content: center;'
+    const disabledStyles =
+        'background: var(--color-secondary-system-background); color: var(--color-quaternary-label); cursor: not-allowed; pointer-events: none; border: 0.5px solid var(--color-system-gray5);'
+    const enabledStyles =
+        'background: var(--color-system-background); color: var(--color-secondary-label); border: 0.5px solid var(--color-system-gray4);'
 
     return `
         <a href="${disabled ? '#' : link}" 
-                class="${baseClasses} ${disabled ? disabledClasses : enabledClasses}">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                style="${baseStyles} ${disabled ? disabledStyles : enabledStyles}">
+            <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 ${icon}
             </svg>
         </a>
@@ -676,21 +1103,21 @@ function buildPageNumberButton(
     sortOrder: string
 ): string {
     if (typeof pageItem === 'string') {
-        return `<span class="px-3 py-2 text-sm font-medium text-gray-500">...</span>`
+        return `<span style="padding: var(--spacing-sm) var(--spacing-md); font-size: 15px; font-weight: var(--font-weight-medium); color: var(--color-tertiary-label);">...</span>`
     }
 
     const isCurrent = pageItem === currentPage
     const link = buildPageLink(provider, status, q, pageItem, 20, sortBy, sortOrder)
 
-    const baseClasses = 'px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200'
-    const currentClasses =
-        'bg-blue-600 text-white shadow-lg shadow-blue-600/30 border border-blue-600 pointer-events-none'
-    const otherClasses =
-        'bg-white text-gray-800 hover:bg-gray-50 border border-gray-300 hover:border-gray-400 shadow-sm'
+    const baseStyles =
+        'padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-md); font-size: 15px; font-weight: var(--font-weight-medium); transition: all 0.2s ease; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; min-width: 32px;'
+    const currentStyles = 'background: var(--color-system-blue); color: white; pointer-events: none;'
+    const otherStyles =
+        'background: var(--color-system-background); color: var(--color-secondary-label); border: 0.5px solid var(--color-system-gray4);'
 
     return `
         <a href="${isCurrent ? '#' : link}" 
-                class="${baseClasses} ${isCurrent ? currentClasses : otherClasses}">
+                style="${baseStyles} ${isCurrent ? currentStyles : otherStyles}">
             ${pageItem}
         </a>
     `
@@ -764,34 +1191,39 @@ function buildTableHeader(
         currentStatus === 'blocked'
             ? `
         <button type="submit" name="action" value="delete-all-blocked"
-                class="px-4 py-2.5 bg-red-800 hover:bg-red-900 text-white font-semibold rounded-xl text-sm transition-all duration-200 hover:shadow-lg hover:shadow-red-800/25 hover:-translate-y-0.5 border border-red-800">
+                class="apple-btn-destructive"
+                style="padding: var(--spacing-sm) var(--spacing-md); font-size: 15px; background: #d70015;">
             Delete ALL
         </button>
     `
             : ''
 
     return `
-        <div class="p-6 border-b border-gray-200/60 bg-white/30 backdrop-blur-sm">
-            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                    <div class="flex gap-2">${statusTabs}</div>
-                    <div class="flex items-center">
-                        <div class="relative">
-                            <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                            </svg>
-                            <input form="search-form" type="search" name="q" value="${q}" 
-                                   placeholder="Search keys..." 
-                                   class="input-field w-64 pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none text-sm shadow-sm">
+        <div style="padding: var(--spacing-lg); border-bottom: 0.5px solid var(--color-system-gray5); background: var(--color-secondary-system-background);">
+            <div style="display: flex; flex-direction: column; gap: var(--spacing-md);">
+                <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--spacing-md);">
+                    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-md);">
+                        <div style="display: flex; gap: var(--spacing-xs);">${statusTabs}</div>
+                        <div style="display: flex; align-items: center;">
+                            <div style="position: relative;">
+                                <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--color-tertiary-label);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                </svg>
+                                <input form="search-form" type="search" name="q" value="${q}" 
+                                       placeholder="Search keys..." 
+                                       class="apple-input" 
+                                       style="width: 280px; padding-left: var(--spacing-2xl); padding-right: var(--spacing-md); padding-top: var(--spacing-sm); padding-bottom: var(--spacing-sm);">
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button type="submit" name="action" value="delete" 
-                            class="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm transition-all duration-200 hover:shadow-lg hover:shadow-red-600/25 hover:-translate-y-0.5 border border-red-600">
-                        Delete Selected
-                    </button>
-                    ${deleteAllButton}
+                    <div style="display: flex; align-items: center; gap: var(--spacing-xs);">
+                        <button type="submit" name="action" value="delete" 
+                                class="apple-btn-destructive"
+                                style="padding: var(--spacing-sm) var(--spacing-md); font-size: 15px;">
+                            Delete Selected
+                        </button>
+                        ${deleteAllButton}
+                    </div>
                 </div>
             </div>
         </div>
@@ -837,39 +1269,39 @@ function buildTableContent(
     )
 
     return `
-        <div class="overflow-x-auto">
-            <table class="w-full table-fixed">
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; table-layout: fixed;">
                 <colgroup>
-                    <col class="w-12">
-                    <col class="w-64">
-                    <col class="w-48">
-                    <col class="w-32">
-                    <col class="w-24">
+                    <col style="width: 48px;">
+                    <col style="width: 260px;">
+                    <col style="width: 200px;">
+                    <col style="width: 140px;">
+                    <col style="width: 120px;">
                 </colgroup>
                 <thead>
-                    <tr class="bg-gradient-to-r from-slate-100/90 to-gray-100/90 border-b border-gray-400/80 backdrop-blur-sm">
-                        <th class="p-4 text-left">
+                    <tr style="background: var(--color-secondary-system-background); border-bottom: 0.5px solid var(--color-system-gray5);">
+                        <th style="padding: var(--spacing-md); text-align: left;">
                             <input type="checkbox" 
                                    onchange="document.querySelectorAll('[name=key_id]').forEach(c => c.checked = this.checked)" 
-                                   class="h-4 w-4 text-blue-600 bg-white border-gray-500 rounded focus:ring-blue-500 transition-colors backdrop-blur-sm">
+                                   style="width: 16px; height: 16px; accent-color: var(--color-system-blue); border-radius: var(--radius-xs);">
                         </th>
-                        <th class="p-4 text-left font-semibold text-slate-800 text-sm tracking-wide">API Key</th>
-                        <th class="p-4 text-left font-semibold text-slate-800 text-sm tracking-wide">Remark</th>
-                        <th class="p-4 text-left font-semibold text-slate-800 text-sm tracking-wide">
-                            <a href="${coolingLink}" class="flex items-center gap-2 hover:text-blue-700 transition-colors duration-200">
+                        <th style="padding: var(--spacing-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-secondary-label); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">API Key</th>
+                        <th style="padding: var(--spacing-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-secondary-label); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Remark</th>
+                        <th style="padding: var(--spacing-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-secondary-label); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">
+                            <a href="${coolingLink}" style="display: flex; align-items: center; gap: var(--spacing-xs); color: var(--color-system-blue); text-decoration: none; transition: opacity 0.2s ease;">
                                 <span>Cooling Time</span>
                                 ${getSortIcon('totalCoolingSeconds', sortBy, sortOrder)}
                             </a>
                         </th>
-                        <th class="p-4 text-left font-semibold text-slate-800 text-sm tracking-wide">
-                            <a href="${usedTimeLink}" class="flex items-center gap-2 hover:text-blue-700 transition-colors duration-200">
+                        <th style="padding: var(--spacing-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-secondary-label); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">
+                            <a href="${usedTimeLink}" style="display: flex; align-items: center; gap: var(--spacing-xs); color: var(--color-system-blue); text-decoration: none; transition: opacity 0.2s ease;">
                                 <span>Used Time</span>
                                 ${getSortIcon('createdAt', sortBy, sortOrder)}
                             </a>
                         </th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-300/60">
+                <tbody>
                     ${keyRows}
                 </tbody>
             </table>
@@ -884,21 +1316,21 @@ function buildTableFooter(total: number, paginationControls: string): string {
 
     if (!paginationControls) {
         return `
-        <div class="flex justify-center items-center p-6 border-t border-gray-300/80 bg-gray-100/60 backdrop-blur-sm">
-            <div class="px-4 py-2 rounded-xl bg-white/90 text-gray-800 text-sm font-semibold border border-gray-300/80 shadow-sm backdrop-blur-sm">
-                ${total}
+        <div style="display: flex; justify-content: center; align-items: center; padding: var(--spacing-lg); border-top: 0.5px solid var(--color-system-gray5); background: var(--color-secondary-system-background);">
+            <div style="padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-lg); background: var(--color-system-background); color: var(--color-secondary-label); font-size: 15px; font-weight: var(--font-weight-semibold); border: 0.5px solid var(--color-system-gray4);">
+                ${total} items
             </div>
         </div>
     `
     }
 
     return `
-        <div class="flex justify-center items-center p-6 border-t border-gray-300/80 bg-gray-100/60 backdrop-blur-sm">
-            <div class="flex items-center gap-2 p-3 bg-white/90 rounded-xl border border-gray-300/80 shadow-sm backdrop-blur-sm">
+        <div style="display: flex; justify-content: center; align-items: center; padding: var(--spacing-lg); border-top: 0.5px solid var(--color-system-gray5); background: var(--color-secondary-system-background);">
+            <div style="display: flex; align-items: center; gap: var(--spacing-xs); padding: var(--spacing-sm); background: var(--color-system-background); border-radius: var(--radius-lg); border: 0.5px solid var(--color-system-gray4);">
                 ${paginationControls}
-                <div class="h-6 w-px bg-gray-300/80"></div>
-                <div class="px-3 text-gray-600 text-sm font-semibold">
-                    ${total}
+                <div style="height: 20px; width: 0.5px; background: var(--color-system-gray4); margin: 0 var(--spacing-sm);"></div>
+                <div style="padding: 0 var(--spacing-sm); color: var(--color-secondary-label); font-size: 15px; font-weight: var(--font-weight-semibold);">
+                    ${total} items
                 </div>
             </div>
         </div>
@@ -922,34 +1354,37 @@ function buildAddKeysForm(
     sortOrder: string
 ): string {
     return `
-        <div class="glass-card bg-white/80 rounded-3xl shadow-xl p-6 border border-gray-200 max-w-5xl mx-auto">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="p-2 bg-blue-100 rounded-xl border border-blue-200">
-                    <svg class="w-5 h-5 text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="apple-card" style="padding: var(--spacing-lg); max-width: 1200px; margin: 0 auto;">
+            <div style="display: flex; align-items: center; gap: var(--spacing-md); margin-bottom: var(--spacing-lg);">
+                <div style="padding: var(--spacing-sm); background: var(--color-secondary-system-background); border-radius: var(--radius-lg); border: 0.5px solid var(--color-system-gray4);">
+                    <svg style="width: 20px; height: 20px; color: var(--color-system-blue);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                     </svg>
                 </div>
-                <h2 class="text-xl font-bold text-gray-900">Add New Keys</h2>
+                <h2 style="font-size: 20px; font-weight: var(--font-weight-semibold); color: var(--color-label); margin: 0; line-height: 1.4; letter-spacing: -0.011em;">Add New Keys</h2>
             </div>
-            <form method="POST">
+            <form method="POST" style="display: flex; flex-direction: column; gap: var(--spacing-lg);">
                 <input type="hidden" name="action" value="add">
-                <div class="mb-6">
-                    <label class="block text-gray-800 text-sm font-semibold mb-3">API Keys</label>
+                <div>
+                    <label style="display: block; color: var(--color-label); font-size: 17px; font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-sm); line-height: 1.29412; letter-spacing: -0.022em;">API Keys</label>
                     <textarea name="keys" 
-                              class="input-field w-full p-4 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none font-mono text-sm resize-none shadow-sm" 
-                              rows="4" 
+                              class="apple-input" 
+                              style="width: 100%; padding: var(--spacing-md); font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Fira Mono', 'Droid Sans Mono', 'Consolas', monospace; font-size: 15px; resize: none; min-height: 120px;"
+                              rows="5" 
                               placeholder="Enter API keys, one per line or separated by commas"></textarea>
                 </div>
-                <div class="mb-6">
-                    <label class="block text-gray-800 text-sm font-semibold mb-3">Remark</label>
+                <div>
+                    <label style="display: block; color: var(--color-label); font-size: 17px; font-weight: var(--font-weight-semibold); margin-bottom: var(--spacing-sm); line-height: 1.29412; letter-spacing: -0.022em;">Remark</label>
                     <input name="remark"
-                              class="input-field w-full p-4 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none text-sm shadow-sm"
+                              class="apple-input"
+                              style="width: 100%; padding: var(--spacing-md);"
                               placeholder="Enter remark for these keys (optional)"/>
                 </div>
-                <div class="flex justify-end">
+                <div style="display: flex; justify-content: flex-end;">
                     <button type="submit" 
                             formaction="/keys/${provider}${buildPageLink(provider, currentStatus, q, page, 20, sortBy, sortOrder)}" 
-                            class="btn-primary px-6 py-3 text-white font-semibold rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-200">
+                            class="apple-btn-primary"
+                            style="padding: var(--spacing-md) var(--spacing-lg);">
                         Add Keys
                     </button>
                 </div>
@@ -960,20 +1395,20 @@ function buildAddKeysForm(
 
 function buildModelCoolingsModal(): string {
     return `
-        <div id="modelCoolingsModal" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm hidden items-center justify-center z-50" onclick="closeModal(event)">
-            <div class="glass-card bg-white rounded-3xl shadow-2xl border border-gray-200 max-w-2xl w-full mx-6 max-h-[80vh] overflow-hidden" onclick="event.stopPropagation()">
-                <div class="p-6 border-b border-gray-200 bg-white/80">
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-xl font-bold text-gray-900">Model Cooling Details</h3>
-                        <button onclick="closeModal()" class="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200">
-                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div id="modelCoolingsModal" style="position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 50; padding: var(--spacing-lg);" onclick="closeModal(event)">
+            <div class="apple-card" style="max-width: 600px; width: 100%; max-height: 80vh; overflow: hidden;" onclick="event.stopPropagation()">
+                <div style="padding: var(--spacing-lg); border-bottom: 0.5px solid var(--color-system-gray5); background: var(--color-secondary-system-background);">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <h3 style="font-size: 20px; font-weight: var(--font-weight-semibold); color: var(--color-label); margin: 0; line-height: 1.4; letter-spacing: -0.011em;">Model Cooling Details</h3>
+                        <button onclick="closeModal()" style="padding: var(--spacing-sm); background: none; border: none; border-radius: var(--radius-md); cursor: pointer; transition: background-color 0.2s ease;" onmouseover="this.style.backgroundColor='var(--color-secondary-system-fill)'" onmouseout="this.style.backgroundColor='transparent'">
+                            <svg style="width: 20px; height: 20px; color: var(--color-secondary-label);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
                         </button>
                     </div>
-                    <p class="text-sm text-gray-600 mt-2">Key: <span id="modalKeyName" class="font-mono"></span></p>
+                    <p style="font-size: 15px; color: var(--color-secondary-label); margin-top: var(--spacing-sm); margin-bottom: 0;">Key: <span id="modalKeyName" style="font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Fira Mono', 'Droid Sans Mono', 'Consolas', monospace; font-size: 13px;"></span></p>
                 </div>
-                <div class="p-6 overflow-y-auto max-h-96">
+                <div style="padding: var(--spacing-lg); overflow-y: auto; max-height: 400px;">
                     <div id="modelCoolingsTable"></div>
                 </div>
             </div>
@@ -996,35 +1431,35 @@ function buildModalScript(): string {
                     const now = Date.now() / 1000;
                     
                     if (Object.keys(modelCoolings).length === 0) {
-                        modalTable.innerHTML = '<p class="text-gray-600 text-center py-8">No model cooling data available</p>';
+                        modalTable.innerHTML = '<p style="color: var(--color-secondary-label); text-align: center; padding: var(--spacing-3xl); font-size: 17px;">No model cooling data available</p>';
                     } else {
                         const rows = Object.entries(modelCoolings).map(([model, cooling]) => {
                             const isAvailable = cooling.end_at < now;
                             const remainingTime = isAvailable ? '-' : formatTime(cooling.end_at - now);
                             const totalTime = formatTime(cooling.total_seconds);
-                            const statusClass = isAvailable ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50';
+                            const statusClass = isAvailable ? 'color: var(--color-system-green); background: rgba(52, 199, 89, 0.1); border: 0.5px solid rgba(52, 199, 89, 0.2);' : 'color: var(--color-system-red); background: rgba(255, 59, 48, 0.1); border: 0.5px solid rgba(255, 59, 48, 0.2);';
                             const status = isAvailable ? 'available' : 'cooling';
                             
                             return \`
-                                <tr class="border-b border-gray-200">
-                                    <td class="p-3 font-mono text-sm">\${model}</td>
-                                    <td class="p-3 text-sm">\${totalTime}</td>
-                                    <td class="p-3 text-sm">\${remainingTime}</td>
-                                    <td class="p-3">
-                                        <span class="px-2 py-1 rounded-lg text-xs font-medium \${statusClass}">\${status}</span>
+                                <tr style="border-bottom: 0.5px solid var(--color-system-gray5);">
+                                    <td style="padding: var(--spacing-md); font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Fira Mono', 'Droid Sans Mono', 'Consolas', monospace; font-size: 13px; color: var(--color-label);">\${model}</td>
+                                    <td style="padding: var(--spacing-md); font-size: 15px; color: var(--color-label);">\${totalTime}</td>
+                                    <td style="padding: var(--spacing-md); font-size: 15px; color: var(--color-label);">\${remainingTime}</td>
+                                    <td style="padding: var(--spacing-md);">
+                                        <span style="padding: var(--spacing-xs) var(--spacing-sm); border-radius: var(--radius-sm); font-size: 12px; font-weight: var(--font-weight-medium); \${statusClass}">\${status}</span>
                                     </td>
                                 </tr>
                             \`;
                         }).join('');
                         
                         modalTable.innerHTML = \`
-                            <table class="w-full">
+                            <table style="width: 100%; border-radius: var(--radius-md); overflow: hidden; border: 0.5px solid var(--color-system-gray5);">
                                 <thead>
-                                    <tr class="border-b border-gray-200 bg-gray-50">
-                                        <th class="p-3 text-left font-semibold text-gray-900">Model</th>
-                                        <th class="p-3 text-left font-semibold text-gray-900">Total Cooling Time</th>
-                                        <th class="p-3 text-left font-semibold text-gray-900">Remaining Time</th>
-                                        <th class="p-3 text-left font-semibold text-gray-900">Status</th>
+                                    <tr style="background: var(--color-secondary-system-background); border-bottom: 0.5px solid var(--color-system-gray5);">
+                                        <th style="padding: var(--spacing-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-secondary-label); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Model</th>
+                                        <th style="padding: var(--spacing-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-secondary-label); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Total Cooling Time</th>
+                                        <th style="padding: var(--spacing-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-secondary-label); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Remaining Time</th>
+                                        <th style="padding: var(--spacing-md); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-secondary-label); font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1034,18 +1469,16 @@ function buildModalScript(): string {
                         \`;
                     }
                 } catch (e) {
-                    modalTable.innerHTML = '<p class="text-red-600 text-center py-8">Error parsing model cooling data</p>';
+                    modalTable.innerHTML = '<p style="color: var(--color-system-red); text-align: center; padding: var(--spacing-3xl); font-size: 17px;">Error parsing model cooling data</p>';
                 }
                 
-                modal.classList.remove('hidden');
-                modal.classList.add('flex');
+                modal.style.display = 'flex';
             }
             
             function closeModal(event) {
                 if (!event || event.target === event.currentTarget) {
                     const modal = document.getElementById('modelCoolingsModal');
-                    modal.classList.add('hidden');
-                    modal.classList.remove('flex');
+                    modal.style.display = 'none';
                 }
             }
             
