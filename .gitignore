@@ -212,3 +212,10 @@ src/service/d1/migrations/
 docs/
 worker-configuration.d.ts
 wrangler.jsonc
+
+# API keys and sensitive files
+key.txt
+*.key
+
+# Backup files
+*.backup
