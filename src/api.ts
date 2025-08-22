@@ -391,8 +391,8 @@ async function handleOpenAICompat(request: Request, env: Env, ctx: ExecutionCont
         const { transformedBody, restResource, originalStream, realModel } =
             await openaiCompat.transformOpenAIToGeminiRequest(request)
 
-        // 检查认证
-        const authKey = getAuthKey(request, 'google-ai-studio')
+        // 检查认证 - OpenAI 兼容格式总是使用 Authorization 头
+        const authKey = getAuthKeyFromHeader(request, 'openai-compat')
         if (!util.isApiRequestAllowed(authKey, env.AUTH_KEY, 'google-ai-studio', realModel)) {
             return new Response(
                 JSON.stringify({
