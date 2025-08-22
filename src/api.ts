@@ -1,5 +1,6 @@
 import * as keyService from './service/key'
 import * as util from './util'
+import * as openaiCompat from './service/openai-compat'
 import type * as schema from './service/d1/schema'
 
 const PROVIDER_CUSTOM_AUTH_HEADER: Record<string, string> = {
@@ -20,6 +21,12 @@ export async function handle(request: Request, env: Env, ctx: ExecutionContext):
 
     const provider = restResource.split('/')[0]
     const authKey = getAuthKey(request, provider)
+    
+    // 处理 OpenAI 兼容格式
+    if (openaiCompat.isOpenAICompatRequest(restResource)) {
+        return await handleOpenAICompat(request, env, ctx)
+    }
+
     const realProviderAndModel = await extractRealProviderAndModel(request, restResource, provider)
     if (!realProviderAndModel) {
         return new Response('Not supported request: valid provider or model not found', { status: 400 })
@@ -376,4 +383,147 @@ function getGoogleAiStudioErrorDetail(body: any, type: string): any | null {
     }
 
     return null
+}
+
+async function handleOpenAICompat(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    try {
+        // 转换 OpenAI 格式到 Gemini 格式
+        const { transformedBody, restResource, originalStream, realModel } =
+            await openaiCompat.transformOpenAIToGeminiRequest(request)
+
+        // 检查认证
+        const authKey = getAuthKey(request, 'google-ai-studio')
+        if (!util.isApiRequestAllowed(authKey, env.AUTH_KEY, 'google-ai-studio', realModel)) {
+            return new Response(
+                JSON.stringify({
+                    error: {
+                        message: 'Invalid auth key',
+                        type: 'authentication_error', 
+                        code: 'invalid_api_key'
+                    }
+                }),
+                { status: 403, headers: { 'Content-Type': 'application/json' } }
+            )
+        }
+
+        // 获取 Google AI Studio 的活跃密钥
+        const activeKeys = await keyService.listActiveKeysViaCache(env, 'google-ai-studio')
+        if (activeKeys.length === 0) {
+            return new Response(
+                JSON.stringify({
+                    error: {
+                        message: 'No active keys available for google-ai-studio',
+                        type: 'api_error',
+                        code: 'no_active_keys'
+                    }
+                }),
+                { status: 503, headers: { 'Content-Type': 'application/json' } }
+            )
+        }
+
+        const MAX_RETRIES = 10
+        for (let i = 0; i < MAX_RETRIES; i++) {
+            if (activeKeys.length === 0) {
+                break
+            }
+
+            const selectedKey = await selectKey(activeKeys, realModel)
+
+            // 使用现有的 makeGatewayRequest 函数
+            const reqToGateway = await makeGatewayRequest(
+                'POST',
+                new Headers({ 'Content-Type': 'application/json' }),
+                new TextEncoder().encode(transformedBody),
+                env,
+                restResource,
+                selectedKey.key
+            )
+
+            const geminiResponse = await fetch(reqToGateway)
+            const status = geminiResponse.status
+
+            switch (status) {
+                case 400:
+                    if (!(await keyIsInvalid(geminiResponse, 'google-ai-studio'))) {
+                        // 用户错误，直接返回转换后的响应
+                        return await openaiCompat.transformGeminiToOpenAIResponse(
+                            geminiResponse,
+                            originalStream,
+                            realModel
+                        )
+                    }
+
+                case 401:
+                case 403:
+                    ctx.waitUntil(keyService.setKeyStatus(env, 'google-ai-studio', selectedKey.id, 'blocked'))
+                    console.error(`key ${selectedKey.key} is blocked due to ${status}`)
+                    if (activeKeys.length < 500) {
+                        activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
+                    }
+                    continue
+
+                case 429:
+                    const sec = await analyze429CooldownSeconds(
+                        env,
+                        geminiResponse,
+                        'google-ai-studio',
+                        selectedKey.key
+                    )
+                    ctx.waitUntil(
+                        keyService.setKeyModelCooldownIfAvailable(
+                            env,
+                            selectedKey.id,
+                            'google-ai-studio',
+                            realModel,
+                            sec
+                        )
+                    )
+                    console.warn(`key ${selectedKey.key} is cooling down for model ${realModel} due to 429`)
+                    if (activeKeys.length < 500) {
+                        activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
+                    }
+                    continue
+
+                case 500:
+                case 502:
+                case 503:
+                case 504:
+                    console.error(`gateway returned 5xx ${await geminiResponse.text()}`)
+                    continue
+            }
+
+            if (status / 100 === 2) {
+                consecutive429Count.delete(selectedKey.id)
+                // 成功响应，转换为 OpenAI 格式
+                return await openaiCompat.transformGeminiToOpenAIResponse(geminiResponse, originalStream, realModel)
+            } else {
+                console.error(`gateway returned ${status}`)
+            }
+
+            return await openaiCompat.transformGeminiToOpenAIResponse(geminiResponse, originalStream, realModel)
+        }
+
+        return new Response(
+            JSON.stringify({
+                error: {
+                    message: 'Internal server error after retries',
+                    type: 'api_error',
+                    code: 'max_retries_exceeded'
+                }
+            }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
+        )
+    } catch (error) {
+        console.error('Error in handleOpenAICompat:', error)
+        return new Response(
+            JSON.stringify({
+                error: {
+                    message: 'Failed to process OpenAI compatible request',
+                    type: 'api_error',
+                    code: 'processing_error'
+                }
+            }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
+        )
+    }
 }
