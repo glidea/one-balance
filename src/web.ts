@@ -9,7 +9,7 @@ const PROVIDER_CONFIGS = {
     'azure-openai': { color: 'from-blue-500 to-cyan-400', icon: '⊞', bgColor: 'from-blue-50 to-cyan-50' },
     'aws-bedrock': { color: 'from-yellow-500 to-orange-500', icon: '◆', bgColor: 'from-yellow-50 to-orange-50' },
     cartesia: { color: 'from-purple-400 to-pink-400', icon: 'C', bgColor: 'from-purple-50 to-pink-50' },
-    'cerebras': { color: 'from-gray-600 to-gray-800', icon: '◉', bgColor: 'from-gray-50 to-gray-100' },
+    cerebras: { color: 'from-gray-600 to-gray-800', icon: '◉', bgColor: 'from-gray-50 to-gray-100' },
     cohere: { color: 'from-green-400 to-teal-500', icon: '●', bgColor: 'from-green-50 to-teal-50' },
     deepseek: { color: 'from-indigo-500 to-purple-600', icon: '◈', bgColor: 'from-indigo-50 to-purple-50' },
     elevenlabs: { color: 'from-pink-400 to-rose-500', icon: '♫', bgColor: 'from-pink-50 to-rose-50' },
@@ -122,7 +122,9 @@ async function handleKeysPost(
         const keyIds = formData.getAll('key_id') as string[]
         await keyService.delKeys(env, keyIds)
     } else if (action === 'delete-all-blocked') {
-        await keyService.delAllBlockedKeys(env, params.provider)
+        await keyService.delKeysByStatus(env, params.provider, 'blocked')
+    } else if (action === 'delete-all-active') {
+        await keyService.delKeysByStatus(env, params.provider, 'active')
     }
 
     const redirectParams = new URLSearchParams()
@@ -764,11 +766,20 @@ function buildTableHeader(
         currentStatus === 'blocked'
             ? `
         <button type="submit" name="action" value="delete-all-blocked"
+                onclick="return confirm('Are you sure you want to delete ALL blocked keys? This action cannot be undone.')"
                 class="px-4 py-2.5 bg-red-800 hover:bg-red-900 text-white font-semibold rounded-xl text-sm transition-all duration-200 hover:shadow-lg hover:shadow-red-800/25 hover:-translate-y-0.5 border border-red-800">
-            Delete ALL
+            Delete ALL Blocked
         </button>
     `
-            : ''
+            : currentStatus === 'active'
+              ? `
+        <button type="submit" name="action" value="delete-all-active"
+                onclick="return confirm('Are you sure you want to delete ALL active keys? This action cannot be undone.')"
+                class="px-4 py-2.5 bg-red-800 hover:bg-red-900 text-white font-semibold rounded-xl text-sm transition-all duration-200 hover:shadow-lg hover:shadow-red-800/25 hover:-translate-y-0.5 border border-red-800">
+            Delete ALL Active
+        </button>
+    `
+              : ''
 
     return `
         <div class="p-6 border-b border-gray-200/60 bg-white/30 backdrop-blur-sm">

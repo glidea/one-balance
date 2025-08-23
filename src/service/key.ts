@@ -180,9 +180,9 @@ export async function delKeys(env: Env, keyIds: string[]) {
     await d1.db(env).delete(schema.keys).where(drizzle.inArray(schema.keys.id, keyIds))
 }
 
-export async function delAllBlockedKeys(env: Env, provider: string) {
+export async function delKeysByStatus(env: Env, provider: string, status: string) {
     await d1
         .db(env)
         .delete(schema.keys)
-        .where(drizzle.and(drizzle.eq(schema.keys.provider, provider), drizzle.eq(schema.keys.status, 'blocked')))
+        .where(drizzle.and(drizzle.eq(schema.keys.provider, provider), drizzle.eq(schema.keys.status, status)))
 }
