@@ -2,6 +2,7 @@ import * as keyService from './service/key'
 import * as util from './util'
 import * as openaiCompat from './service/openai-compat'
 import type * as schema from './service/d1/schema'
+import { perfMonitor, logPerformanceReport } from './util/performance'
 
 const PROVIDER_CUSTOM_AUTH_HEADER: Record<string, string> = {
     'google-ai-studio': 'x-goog-api-key',
@@ -16,32 +17,53 @@ function getAuthHeaderName(provider: string): string {
 }
 
 export async function handle(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const url = new URL(request.url)
-    const restResource = url.pathname.substring('/api/'.length) + url.search
+    const key = perfMonitor.start('api.handle')
+    try {
+        const url = new URL(request.url)
+        const restResource = url.pathname.substring('/api/'.length) + url.search
 
-    const provider = restResource.split('/')[0]
-    const authKey = getAuthKey(request, provider)
+        // 处理性能报告请求
+        if (restResource === 'perf' || restResource === 'perf/') {
+            const authKey = getAuthKeyFromHeader(request, 'openai-compat')
+            // 使用 google-ai-studio 提供商进行认证，因为这是一个通用的提供商
+            if (!util.isApiRequestAllowed(authKey, env.AUTH_KEY, 'google-ai-studio', 'gemini-2.0-flash')) {
+                return new Response('Invalid auth key', { status: 403 })
+            }
+            const report = perfMonitor.getReport()
+            return new Response(report, {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            })
+        }
 
-    // 处理 OpenAI 兼容格式
-    if (openaiCompat.isOpenAICompatRequest(restResource)) {
-        return await handleOpenAICompat(request, env, ctx)
+        const provider = restResource.split('/')[0]
+        const authKey = getAuthKey(request, provider)
+
+        // 处理 OpenAI 兼容格式
+        if (openaiCompat.isOpenAICompatRequest(restResource)) {
+            return await handleOpenAICompat(request, env, ctx)
+        }
+
+        // 处理 OpenAI 兼容的模型列表请求
+        if (openaiCompat.isModelsRequest(restResource)) {
+            return await handleModelsRequest(request, env, ctx)
+        }
+
+        const realProviderAndModel = await extractRealProviderAndModel(request, restResource, provider)
+        if (!realProviderAndModel) {
+            return new Response('Not supported request: valid provider or model not found', { status: 400 })
+        }
+
+        if (
+            !util.isApiRequestAllowed(authKey, env.AUTH_KEY, realProviderAndModel.provider, realProviderAndModel.model)
+        ) {
+            return new Response('Invalid auth key', { status: 403 })
+        }
+
+        return await forward(request, env, ctx, restResource, realProviderAndModel.provider, realProviderAndModel.model)
+    } finally {
+        perfMonitor.end(key, 'api.handle')
     }
-
-    // 处理 OpenAI 兼容的模型列表请求
-    if (openaiCompat.isModelsRequest(restResource)) {
-        return await handleModelsRequest(request, env, ctx)
-    }
-
-    const realProviderAndModel = await extractRealProviderAndModel(request, restResource, provider)
-    if (!realProviderAndModel) {
-        return new Response('Not supported request: valid provider or model not found', { status: 400 })
-    }
-
-    if (!util.isApiRequestAllowed(authKey, env.AUTH_KEY, realProviderAndModel.provider, realProviderAndModel.model)) {
-        return new Response('Invalid auth key', { status: 403 })
-    }
-
-    return await forward(request, env, ctx, restResource, realProviderAndModel.provider, realProviderAndModel.model)
 }
 
 async function extractRealProviderAndModel(
@@ -108,82 +130,87 @@ async function forward(
     provider: string,
     model: string
 ): Promise<Response> {
-    const activeKeys = await keyService.listActiveKeysViaCache(env, provider)
-    if (activeKeys.length === 0) {
-        return new Response('No active keys available', { status: 503 })
-    }
-
-    const body = request.body ? await request.arrayBuffer() : null
-    const MAX_RETRIES = 30
-    for (let i = 0; i < MAX_RETRIES; i++) {
+    const key = perfMonitor.start('api.forward')
+    try {
+        const activeKeys = await keyService.listActiveKeysViaCache(env, provider)
         if (activeKeys.length === 0) {
             return new Response('No active keys available', { status: 503 })
         }
 
-        const selectedKey = await selectKey(activeKeys, model)
-        const reqToGateway = await makeGatewayRequest(
-            request.method,
-            request.headers,
-            body,
-            env,
-            restResource,
-            selectedKey.key
-        )
-        const respFromGateway = await fetch(reqToGateway)
-        const status = respFromGateway.status
-        switch (status) {
-            // try block
-            case 400:
-                if (!(await keyIsInvalid(respFromGateway, provider))) {
-                    return respFromGateway // user error
-                }
+        const body = request.body ? await request.arrayBuffer() : null
+        const MAX_RETRIES = 30
+        for (let i = 0; i < MAX_RETRIES; i++) {
+            if (activeKeys.length === 0) {
+                return new Response('No active keys available', { status: 503 })
+            }
 
-            // key is invalid, then continue to block and next key
-            case 401:
-            case 403:
-                ctx.waitUntil(keyService.setKeyStatus(env, provider, selectedKey.id, 'blocked'))
+            const selectedKey = await selectKey(activeKeys, model)
+            const reqToGateway = await makeGatewayRequest(
+                request.method,
+                request.headers,
+                body,
+                env,
+                restResource,
+                selectedKey.key
+            )
+            const respFromGateway = await fetch(reqToGateway)
+            const status = respFromGateway.status
+            switch (status) {
+                // try block
+                case 400:
+                    if (!(await keyIsInvalid(respFromGateway, provider))) {
+                        return respFromGateway // user error
+                    }
 
-                // next key
-                console.error(
-                    `key ${selectedKey.key} is blocked due to ${respFromGateway.status} ${await respFromGateway.text()}`
-                )
-                if (activeKeys.length < 500) {
-                    // save the CPU time for Cloudflare Free plan
-                    activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
-                }
-                continue
+                // key is invalid, then continue to block and next key
+                case 401:
+                case 403:
+                    ctx.waitUntil(keyService.setKeyStatus(env, provider, selectedKey.id, 'blocked'))
 
-            // try cooling down
-            case 429:
-                const sec = await analyze429CooldownSeconds(env, respFromGateway, provider, selectedKey.key)
-                ctx.waitUntil(keyService.setKeyModelCooldownIfAvailable(env, selectedKey.id, provider, model, sec))
+                    // next key
+                    console.error(
+                        `key ${selectedKey.key} is blocked due to ${respFromGateway.status} ${await respFromGateway.text()}`
+                    )
+                    if (activeKeys.length < 500) {
+                        // save the CPU time for Cloudflare Free plan
+                        activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
+                    }
+                    continue
 
-                // next key
-                console.warn(
-                    `key ${selectedKey.key} is cooling down for model ${model} due to 429 ${await respFromGateway.text()}`
-                )
-                if (activeKeys.length < 500) {
-                    activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
-                }
-                continue
+                // try cooling down
+                case 429:
+                    const sec = await analyze429CooldownSeconds(env, respFromGateway, provider, selectedKey.key)
+                    ctx.waitUntil(keyService.setKeyModelCooldownIfAvailable(env, selectedKey.id, provider, model, sec))
 
-            case 500:
-            case 502:
-            case 503:
-            case 504:
-                console.error(`gateway returned 5xx ${await respFromGateway.text()}`)
-                continue // no backoff, just retry...
+                    // next key
+                    console.warn(
+                        `key ${selectedKey.key} is cooling down for model ${model} due to 429 ${await respFromGateway.text()}`
+                    )
+                    if (activeKeys.length < 500) {
+                        activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
+                    }
+                    continue
+
+                case 500:
+                case 502:
+                case 503:
+                case 504:
+                    console.error(`gateway returned 5xx ${await respFromGateway.text()}`)
+                    continue // no backoff, just retry...
+            }
+
+            if (status / 100 === 2) {
+                consecutive429Count.delete(selectedKey.id)
+            } else {
+                console.error(`gateway returned ${status}`)
+            }
+            return respFromGateway
         }
 
-        if (status / 100 === 2) {
-            consecutive429Count.delete(selectedKey.id)
-        } else {
-            console.error(`gateway returned ${status}`)
-        }
-        return respFromGateway
+        return new Response('Internal server error after retries', { status: 500 })
+    } finally {
+        perfMonitor.end(key, 'api.forward')
     }
-
-    return new Response('Internal server error after retries', { status: 500 })
 }
 
 function getAuthKey(request: Request, provider: string): string {
@@ -391,6 +418,7 @@ function getGoogleAiStudioErrorDetail(body: any, type: string): any | null {
 }
 
 async function handleOpenAICompat(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const key = perfMonitor.start('api.handleOpenAICompat')
     try {
         // 转换 OpenAI 格式到 Gemini 格式
         const { transformedBody, restResource, originalStream, realModel } =
@@ -530,6 +558,8 @@ async function handleOpenAICompat(request: Request, env: Env, ctx: ExecutionCont
             }),
             { status: 500, headers: { 'Content-Type': 'application/json' } }
         )
+    } finally {
+        perfMonitor.end(key, 'api.handleOpenAICompat')
     }
 }
 

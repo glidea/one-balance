@@ -124,14 +124,14 @@ AUTH_KEY=your-existing-auth-key pnpm run deploycf
 
 ```bash
 # 方法1: 直接设置环境变量运行
-WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-auth-key node test-openai-compat.mjs
+WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-auth-key node tests/test-openai-compat.mjs
 
 # 方法2: 创建环境变量文件
 cp .env.example .env
 # 编辑 .env 文件，填入你的实际配置
 nano .env
 # 加载环境变量并运行测试
-source .env && node test-openai-compat.mjs
+source .env && node tests/test-openai-compat.mjs
 ```
 
 ### 3. 测试原生格式（确保向后兼容）

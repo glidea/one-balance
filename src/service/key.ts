@@ -1,6 +1,7 @@
 import * as d1 from './d1'
 import * as schema from './d1/schema'
 import * as drizzle from 'drizzle-orm'
+import { perfMonitor } from '../util/performance'
 
 interface Cache<T> {
     data: T
@@ -13,33 +14,38 @@ let activeKeysCacheByProvider: Map<string, Cache<schema.Key[]>> = new Map()
 let cacheMaxAgeSeconds = 60
 
 export async function listActiveKeysViaCache(env: Env, provider: string): Promise<schema.Key[]> {
-    const now = Date.now() / 1000
-    const cache = activeKeysCacheByProvider.get(provider)
+    const key = perfMonitor.start('keyService.listActiveKeysViaCache')
+    try {
+        const now = Date.now() / 1000
+        const cache = activeKeysCacheByProvider.get(provider)
 
-    if (cache && now - cache.updatedAt < cacheMaxAgeSeconds && !cache.isDirty) {
-        return cache.data
+        if (cache && now - cache.updatedAt < cacheMaxAgeSeconds && !cache.isDirty) {
+            return cache.data
+        }
+
+        // may thundering herd, but it should be enough
+        const keys = (await d1.db(env).query.keys.findMany({
+            columns: {
+                id: true,
+                key: true,
+                modelCoolings: true
+            },
+            where: drizzle.and(drizzle.eq(schema.keys.status, 'active'), drizzle.eq(schema.keys.provider, provider)),
+            orderBy: drizzle.sql`RANDOM()`,
+            limit: 1000
+        })) as schema.Key[]
+
+        activeKeysCacheByProvider.set(provider, {
+            data: keys,
+            updatedAt: now,
+            isDirty: false
+        })
+
+        console.info(`cache refreshed for ${provider}: ${keys.length} keys`)
+        return keys
+    } finally {
+        perfMonitor.end(key, 'keyService.listActiveKeysViaCache')
     }
-
-    // may thundering herd, but it should be enough
-    const keys = (await d1.db(env).query.keys.findMany({
-        columns: {
-            id: true,
-            key: true,
-            modelCoolings: true
-        },
-        where: drizzle.and(drizzle.eq(schema.keys.status, 'active'), drizzle.eq(schema.keys.provider, provider)),
-        orderBy: drizzle.sql`RANDOM()`,
-        limit: 1000
-    })) as schema.Key[]
-
-    activeKeysCacheByProvider.set(provider, {
-        data: keys,
-        updatedAt: now,
-        isDirty: false
-    })
-
-    console.info(`cache refreshed for ${provider}: ${keys.length} keys`)
-    return keys
 }
 
 export async function setKeyStatus(env: Env, provider: string, keyId: string, status: string) {

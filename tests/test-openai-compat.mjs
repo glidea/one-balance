@@ -1,24 +1,25 @@
 #!/usr/bin/env node
 
 // 测试 OpenAI 兼容格式和中文编码
+//
+// 配置优先级: 环境变量 > .env文件 > 默认值
+//
 // 使用方法:
-//   WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-secret-key node test-openai-compat.mjs
-// 或者设置环境变量:
-//   export WORKER_URL=https://your-worker.workers.dev
-//   export AUTH_KEY=your-secret-key
-//   node test-openai-compat.mjs
+//   1. 从 .env 文件加载配置: node tests/test-openai-compat.mjs (从项目根目录运行)
+//   2. 命令行传参: WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-secret-key node tests/test-openai-compat.mjs
+//   3. 导入环境变量: source .env && node tests/test-openai-compat.mjs
+//
+// 注意：此脚本使用 ES Modules，需要 Node.js 14+ 支持
 
-const WORKER_URL = process.env.WORKER_URL || 'https://your-worker-url.workers.dev'
-const AUTH_KEY = process.env.AUTH_KEY || 'your-auth-key'
+import { loadTestConfig, validateConfig, printConfig, makeAuthenticatedRequest, TestRunner } from './test-utils.mjs'
 
-async function testNonStreamRequest() {
-    console.log('🧪 测试非流式请求...')
+async function testNonStreamRequest(config) {
+    const { WORKER_URL, AUTH_KEY } = config
 
-    const response = await fetch(`${WORKER_URL}/api/compat/chat/completions`, {
+    const response = await makeAuthenticatedRequest(WORKER_URL, AUTH_KEY, '/api/compat/chat/completions', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${AUTH_KEY}`
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
             model: 'google-ai-studio/gemini-2.0-flash',
@@ -50,14 +51,13 @@ async function testNonStreamRequest() {
     return true
 }
 
-async function testStreamRequest() {
-    console.log('🧪 测试流式请求...')
+async function testStreamRequest(config) {
+    const { WORKER_URL, AUTH_KEY } = config
 
-    const response = await fetch(`${WORKER_URL}/api/compat/chat/completions`, {
+    const response = await makeAuthenticatedRequest(WORKER_URL, AUTH_KEY, '/api/compat/chat/completions', {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${AUTH_KEY}`
+            'Content-Type': 'application/json'
         },
         body: JSON.stringify({
             model: 'google-ai-studio/gemini-2.0-flash',
@@ -122,8 +122,8 @@ async function testStreamRequest() {
     return true
 }
 
-async function testChineseEncoding() {
-    console.log('🧪 测试中文编码专项...')
+async function testChineseEncoding(config) {
+    const { WORKER_URL, AUTH_KEY } = config
 
     const testCases = [
         '你好世界！这是一个中文测试。',
@@ -132,55 +132,58 @@ async function testChineseEncoding() {
         '中英混合：Hello世界，这是mixed language测试。'
     ]
 
+    let passedCases = 0
+
     for (let i = 0; i < testCases.length; i++) {
         const testInput = testCases[i]
         console.log(`\n📝 测试用例 ${i + 1}: ${testInput}`)
 
-        const response = await fetch(`${WORKER_URL}/api/compat/chat/completions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${AUTH_KEY}`
-            },
-            body: JSON.stringify({
-                model: 'google-ai-studio/gemini-2.0-flash',
-                messages: [
-                    {
-                        role: 'user',
-                        content: `请直接复述这段文字，不要添加任何其他内容：${testInput}`
-                    }
-                ],
-                max_tokens: 100
+        try {
+            const response = await makeAuthenticatedRequest(WORKER_URL, AUTH_KEY, '/api/compat/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'google-ai-studio/gemini-2.0-flash',
+                    messages: [
+                        {
+                            role: 'user',
+                            content: `请直接复述这段文字，不要添加任何其他内容：${testInput}`
+                        }
+                    ],
+                    max_tokens: 100
+                })
             })
-        })
 
-        if (response.ok) {
-            const data = await response.json()
-            const output = data.choices[0].message.content
-            console.log(`✅ 输出: ${output}`)
+            if (response.ok) {
+                const data = await response.json()
+                const output = data.choices[0].message.content
+                console.log(`✅ 输出: ${output}`)
 
-            // 简单检查是否包含原始中文内容
-            const hasOriginalContent = testInput.split('').some(char => output.includes(char))
-            if (hasOriginalContent) {
-                console.log('✅ 中文编码正常')
+                // 简单检查是否包含原始中文内容
+                const hasOriginalContent = testInput.split('').some(char => output.includes(char))
+                if (hasOriginalContent) {
+                    console.log('✅ 中文编码正常')
+                    passedCases++
+                } else {
+                    console.log('⚠️  中文编码可能存在问题')
+                }
             } else {
-                console.log('⚠️  中文编码可能存在问题')
+                console.log('❌ 请求失败:', response.status)
             }
-        } else {
-            console.log('❌ 请求失败:', response.status)
+        } catch (error) {
+            console.log('❌ 请求出错:', error.message)
         }
     }
+
+    return passedCases === testCases.length
 }
 
-async function testModelsEndpoint() {
-    console.log('🧪 测试模型列表端点...')
+async function testModelsEndpoint(config) {
+    const { WORKER_URL, AUTH_KEY } = config
 
-    const response = await fetch(`${WORKER_URL}/api/compat/models`, {
-        method: 'GET',
-        headers: {
-            Authorization: `Bearer ${AUTH_KEY}`
-        }
-    })
+    const response = await makeAuthenticatedRequest(WORKER_URL, AUTH_KEY, '/api/compat/models')
 
     if (!response.ok) {
         console.error('❌ 模型列表请求失败:', response.status, await response.text())
@@ -203,35 +206,31 @@ async function testModelsEndpoint() {
 
 async function main() {
     console.log('🚀 开始测试 OpenAI 兼容格式和中文编码...')
-    console.log(`🔗 目标地址: ${WORKER_URL}`)
-    console.log('─'.repeat(60))
 
-    if (WORKER_URL.includes('your-worker-url') || AUTH_KEY.includes('your-auth-key')) {
-        console.error('❌ 请设置环境变量:')
-        console.error('   WORKER_URL=https://your-worker.workers.dev')
-        console.error('   AUTH_KEY=your-secret-key')
-        console.error('')
-        console.error('使用方法:')
-        console.error(
-            '   WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-secret-key node test-openai-compat.mjs'
-        )
+    // 加载配置
+    const config = loadTestConfig()
+
+    // 验证配置
+    if (!validateConfig(config)) {
         process.exit(1)
     }
 
+    // 打印配置信息
+    printConfig(config)
+
+    // 创建测试运行器
+    const runner = new TestRunner('OpenAI兼容性测试')
+
     try {
-        await testModelsEndpoint()
-        console.log('─'.repeat(60))
+        // 执行各项测试
+        await runner.run('模型列表端点', () => testModelsEndpoint(config))
+        await runner.run('非流式请求', () => testNonStreamRequest(config))
+        await runner.run('流式请求', () => testStreamRequest(config))
+        await runner.run('中文编码', () => testChineseEncoding(config))
 
-        await testNonStreamRequest()
-        console.log('─'.repeat(60))
-
-        await testStreamRequest()
-        console.log('─'.repeat(60))
-
-        await testChineseEncoding()
-        console.log('─'.repeat(60))
-
-        console.log('🎉 所有测试完成！')
+        // 打印结果并退出
+        const success = runner.printResults()
+        process.exit(success ? 0 : 1)
     } catch (error) {
         console.error('❌ 测试过程中出现错误:', error)
         process.exit(1)

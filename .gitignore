@@ -224,3 +224,6 @@ key.txt
 .claude/
 .mcp.json
 .playwright-mcp/
+CLAUDE.local.md
+
+prompt.md

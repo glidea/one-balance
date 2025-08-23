@@ -1,6 +1,8 @@
 // OpenAI 兼容格式转换服务
 // 基于 https://github.com/zaunist/gemini-balance-do 实现
 
+import { perfMonitor } from '../util/performance'
+
 interface OpenAIMessage {
     role: 'user' | 'assistant' | 'system'
     content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>
@@ -48,25 +50,30 @@ export async function transformOpenAIToGeminiRequest(request: Request): Promise<
     originalStream: boolean
     realModel: string
 }> {
-    const openaiReq = (await request.json()) as OpenAIRequest
-    const isStream = openaiReq.stream || false
+    const key = perfMonitor.start('openai-compat.transformOpenAIToGeminiRequest')
+    try {
+        const openaiReq = (await request.json()) as OpenAIRequest
+        const isStream = openaiReq.stream || false
 
-    // 提取真实的模型名称 (google-ai-studio/gemini-2.0-flash -> gemini-2.0-flash)
-    const modelParts = openaiReq.model.split('/')
-    const realModel = modelParts[1] || modelParts[0]
+        // 提取真实的模型名称 (google-ai-studio/gemini-2.0-flash -> gemini-2.0-flash)
+        const modelParts = openaiReq.model.split('/')
+        const realModel = modelParts[1] || modelParts[0]
 
-    // 转换为 Gemini 格式
-    const geminiRequest = transformRequestFormat(openaiReq)
+        // 转换为 Gemini 格式
+        const geminiRequest = transformRequestFormat(openaiReq)
 
-    // 构建请求路径
-    const streamPath = isStream ? 'streamGenerateContent?alt=sse' : 'generateContent'
-    const restResource = `google-ai-studio/v1/models/${realModel}:${streamPath}`
+        // 构建请求路径
+        const streamPath = isStream ? 'streamGenerateContent?alt=sse' : 'generateContent'
+        const restResource = `google-ai-studio/v1/models/${realModel}:${streamPath}`
 
-    return {
-        transformedBody: JSON.stringify(geminiRequest),
-        restResource,
-        originalStream: isStream,
-        realModel
+        return {
+            transformedBody: JSON.stringify(geminiRequest),
+            restResource,
+            originalStream: isStream,
+            realModel
+        }
+    } finally {
+        perfMonitor.end(key, 'openai-compat.transformOpenAIToGeminiRequest')
     }
 }
 
@@ -179,10 +186,15 @@ export async function transformGeminiToOpenAIResponse(
     originalStream: boolean,
     model: string
 ): Promise<Response> {
-    if (originalStream) {
-        return transformStreamResponse(geminiResponse, model)
-    } else {
-        return transformNonStreamResponse(geminiResponse, model)
+    const key = perfMonitor.start('openai-compat.transformGeminiToOpenAIResponse')
+    try {
+        if (originalStream) {
+            return transformStreamResponse(geminiResponse, model)
+        } else {
+            return transformNonStreamResponse(geminiResponse, model)
+        }
+    } finally {
+        perfMonitor.end(key, 'openai-compat.transformGeminiToOpenAIResponse')
     }
 }
 

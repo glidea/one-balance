@@ -38,6 +38,16 @@ pnpm migrate:remote
 pnpm deploycf
 ```
 
+### 测试
+
+```bash
+# 运行 OpenAI 兼容格式测试
+node tests/test-openai-compat.mjs
+
+# 使用环境变量运行测试
+WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-key node tests/test-openai-compat.mjs
+```
+
 ## 高层架构
 
 ### 核心组件
@@ -48,6 +58,7 @@ pnpm deploycf
 - **src/web.ts**: Web UI 管理界面，提供密钥管理功能
 - **src/service/key.ts**: 密钥服务层，处理密钥状态和缓存
 - **src/service/d1/**: 数据库层，包含 schema 定义和迁移
+- **tests/**: 测试脚本目录，包含各种功能测试
 
 ### 关键设计模式
 
