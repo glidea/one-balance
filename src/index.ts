@@ -1,6 +1,8 @@
 import * as api from './api'
 import * as web from './web'
 import { perfMonitor, logPerformanceReport } from './util/performance'
+import { logger } from './util/logger'
+import { CONFIG } from './config/constants'
 
 export default {
     fetch: async (request: Request, env: Env, ctx: ExecutionContext): Promise<Response> => {
@@ -18,14 +20,20 @@ export default {
                         try {
                             if (!isPerformanceReport) {
                                 logPerformanceReport()
-                                // 定期重置以避免内存泄漏（每20个请求重置一次）
-                                if (Math.random() < 0.05) {
-                                    // 5%的概率重置
-                                    perfMonitor.reset()
+                                // 定期清理以避免内存泄漏（每20个请求清理一次）
+                                if (Math.random() < CONFIG.PERFORMANCE.RESET_PROBABILITY) {
+                                    // 使用更温和的清理而不是全重置
+                                    perfMonitor.forceCleanup()
+                                }
+
+                                // 检查内存状态
+                                const memStats = perfMonitor.getMemoryStats()
+                                if (!memStats.isHealthy) {
+                                    logger.warn('Performance monitor memory usage high', memStats)
                                 }
                             }
                         } catch (e) {
-                            console.error('Error logging performance report:', e)
+                            logger.error('Performance report logging failed', { error: e.message })
                         }
                     })()
                 )
@@ -35,7 +43,7 @@ export default {
 
             return await web.handle(request, env, ctx)
         } catch (e) {
-            console.error(e)
+            logger.error('Request handler failed', { error: e.message })
             return new Response('Internal Server Error', { status: 500 })
         } finally {
             perfMonitor.end(key, 'index.fetch')

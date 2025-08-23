@@ -2,20 +2,54 @@ import * as d1 from './d1'
 import * as schema from './d1/schema'
 import * as drizzle from 'drizzle-orm'
 import { perfMonitor } from '../util/performance'
+import { logger } from '../util/logger'
+import { CONFIG } from '../config/constants'
 
 interface Cache<T> {
     data: T
     updatedAt: number
     isDirty: boolean
+    timestamp: number // 添加时间戳以便清理
 }
 
 // only shared within a worker instance (shutdown if idle)
-let activeKeysCacheByProvider: Map<string, Cache<schema.Key[]>> = new Map()
-let cacheMaxAgeSeconds = 60
+// 使用普通 Map 和手动清理防止内存泄漏
+const activeKeysCacheByProvider = new Map<string, Cache<schema.Key[]>>()
+const cacheMaxAgeSeconds = CONFIG.API.CACHE_MAX_AGE_SECONDS
+let lastCacheCleanup = 0
+
+// 手动清理过期缓存
+function cleanupCache(): void {
+    const now = Date.now()
+
+    // 限制清理频率（每分钟最多清理一次）
+    if (now - lastCacheCleanup < 60000) return
+    lastCacheCleanup = now
+
+    // 清理5分钟前的缓存
+    const maxAge = 300000 // 5分钟
+    for (const [key, cache] of activeKeysCacheByProvider.entries()) {
+        if (now - cache.timestamp > maxAge) {
+            activeKeysCacheByProvider.delete(key)
+        }
+    }
+
+    // 如果条目过多，删除最旧的20%
+    if (activeKeysCacheByProvider.size > 100) {
+        const entries = Array.from(activeKeysCacheByProvider.entries()).sort((a, b) => a[1].timestamp - b[1].timestamp)
+        const toRemove = Math.floor(activeKeysCacheByProvider.size * 0.2)
+        for (let i = 0; i < toRemove; i++) {
+            activeKeysCacheByProvider.delete(entries[i][0])
+        }
+    }
+}
 
 export async function listActiveKeysViaCache(env: Env, provider: string): Promise<schema.Key[]> {
     const key = perfMonitor.start('keyService.listActiveKeysViaCache')
     try {
+        // 定期清理过期缓存
+        cleanupCache()
+
         const now = Date.now() / 1000
         const cache = activeKeysCacheByProvider.get(provider)
 
@@ -32,16 +66,17 @@ export async function listActiveKeysViaCache(env: Env, provider: string): Promis
             },
             where: drizzle.and(drizzle.eq(schema.keys.status, 'active'), drizzle.eq(schema.keys.provider, provider)),
             orderBy: drizzle.sql`RANDOM()`,
-            limit: 1000
+            limit: CONFIG.DATABASE.KEYS_QUERY_LIMIT
         })) as schema.Key[]
 
         activeKeysCacheByProvider.set(provider, {
             data: keys,
             updatedAt: now,
+            timestamp: Date.now(),
             isDirty: false
         })
 
-        console.info(`cache refreshed for ${provider}: ${keys.length} keys`)
+        logger.info(`Cache refreshed for provider`, { provider, keyCount: keys.length })
         return keys
     } finally {
         perfMonitor.end(key, 'keyService.listActiveKeysViaCache')
@@ -171,7 +206,7 @@ export async function addKeys(env: Env, keys: KeyForAdd[]) {
     }
 
     const db = d1.db(env)
-    const chunkSize = 15
+    const chunkSize = CONFIG.DATABASE.BATCH_INSERT_SIZE
     for (let i = 0; i < keys.length; i += chunkSize) {
         const chunk = keys.slice(i, i + chunkSize)
         await db.insert(schema.keys).values(chunk).onConflictDoNothing()

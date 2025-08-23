@@ -44,6 +44,12 @@ pnpm deploycf
 # 运行 OpenAI 兼容格式测试
 node tests/test-openai-compat.mjs
 
+# 测试系统改进功能（健康检查、错误统计、性能监控）
+WORKER_URL=http://localhost:8080 AUTH_KEY=your-key node tests/test-improvements.mjs
+
+# 性能测试
+node tests/test-performance.mjs
+
 # 使用环境变量运行测试
 WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-key node tests/test-openai-compat.mjs
 ```
@@ -52,13 +58,38 @@ WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-key node tests/test-ope
 
 ### 核心组件
 
-- **src/index.ts**: Worker 入口点，路由到 API 或 Web 处理器
-- **src/api.ts**: API 请求处理，包含密钥轮询、错误处理和重试逻辑
+#### 主要模块
+
+- **src/index.ts**: Worker 入口点，路由到 API 或 Web 处理器，集成性能监控
+- **src/api.ts**: API 请求处理，包含智能密钥轮询、统一错误处理、指数退避重试和系统监控端点
 - **src/service/openai-compat.ts**: OpenAI 兼容格式转换服务，支持流式响应
-- **src/web.ts**: Web UI 管理界面，提供密钥管理功能
-- **src/service/key.ts**: 密钥服务层，处理密钥状态和缓存
+- **src/web.ts**: Web UI 入口，重构为模块化架构
+- **src/service/key.ts**: 密钥服务层，处理密钥状态、线程安全缓存和并发控制
 - **src/service/d1/**: 数据库层，包含 schema 定义和迁移
-- **tests/**: 测试脚本目录，包含各种功能测试
+
+#### 工具和配置模块
+
+- **src/util/errors.ts**: 统一错误处理系统，支持错误分类、聚合和模式识别
+- **src/util/logger.ts**: 安全日志系统，自动脱敏敏感信息（API密钥、Token等）
+- **src/util/performance.ts**: 性能监控系统，兼容 Cloudflare Workers 环境
+- **src/util/memory-manager.ts**: 内存管理工具，实现LRU+TTL缓存策略，防止内存泄漏
+- **src/config/constants.ts**: 集中化配置管理，包含 API、内存、性能等配置项
+- **src/types/**: TypeScript 类型定义目录，强化类型安全
+
+#### Web UI 模块
+
+- **src/web/**: 模块化Web UI组件
+    - **src/web/index.ts**: Web处理器主逻辑
+    - **src/web/helpers.ts**: UI帮助函数和组件
+    - **src/web/templates/**: HTML模板（login.ts, layout.ts）
+    - **src/web/config/**: Web配置（providers.ts）
+
+#### 测试套件
+
+- **tests/test-openai-compat.mjs**: OpenAI兼容格式测试
+- **tests/test-improvements.mjs**: 新功能测试（健康检查、错误统计、性能监控）
+- **tests/test-performance.mjs**: 性能基准测试
+- **tests/test-utils.mjs**: 测试工具库和公共函数
 
 ### 关键设计模式
 
@@ -68,11 +99,23 @@ WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-key node tests/test-ope
 - **模型级冷却**: 针对特定模型设置冷却期，而非整个密钥
 - **连续 429 检测**: 使用内存计数器跟踪连续限流，触发长期冷却
 
-#### 错误处理与状态管理
+#### 统一错误处理系统
 
-- **401/403**: 密钥无效，自动标记为 blocked
-- **429**: 限流错误，根据提供商智能设置冷却时间
-- **Google AI Studio 特殊处理**: 区分分钟级和天级配额限制
+- **错误分类**: 按类型分类（认证、限流、网络、服务器、客户端、验证）
+- **指数退避**: 智能重试策略，支持抖动和最大延迟限制
+- **错误聚合**: 实时收集错误统计，识别错误模式和趋势
+- **状态管理**:
+    - **401/403**: 密钥无效，自动标记为 blocked
+    - **429**: 限流错误，根据提供商智能设置冷却时间
+    - **5xx**: 服务器错误，应用指数退避重试
+    - **Google AI Studio 特殊处理**: 区分分钟级和天级配额限制，解析详细错误信息
+
+#### 性能监控与内存管理
+
+- **实时性能追踪**: 自动监控函数执行时间，识别性能瓶颈
+- **内存管理策略**: LRU+TTL 混合缓存，自动清理过期数据
+- **线程安全设计**: 并发安全的429计数器和缓存操作
+- **Cloudflare Workers 兼容**: 避免全局作用域异步操作，兼容Workers运行时限制
 
 #### OpenAI 兼容格式支持
 
@@ -87,6 +130,9 @@ WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-key node tests/test-ope
 - **activeKeysCacheByProvider**: 按提供商缓存活跃密钥列表
 - **isDirty 机制**: 状态变更时标记缓存为脏，确保数据一致性
 - **60秒缓存时间**: 平衡性能和数据新鲜度
+- **LRU+TTL 策略**: 最近最少使用算法结合时间过期，自动清理
+- **内存保护**: 限制缓存条目数量，防止内存溢出
+- **并发安全**: 原子性操作，避免竞态条件
 
 ## 数据库 Schema
 
@@ -118,12 +164,22 @@ WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-key node tests/test-ope
 
 ### 重要实现细节
 
-- **内存计数器**: consecutive429Count 用于跟踪连续限流，权衡性能和准确性
+- **线程安全计数器**: 封装的 `Consecutive429Counter` 类，支持原子性操作和自动清理
 - **时区处理**: Google AI Studio 配额重置使用太平洋时间
 - **JSON 操作**: 使用 SQLite JSON 函数更新 modelCoolings 字段
-- **错误恢复**: 最多重试 10 次，支持不同错误类型的不同处理策略
+- **智能错误恢复**:
+    - 最多重试 30 次，支持指数退避策略
+    - 不同错误类型的差异化处理策略
+    - 网络错误自动重试，认证错误立即切换密钥
+- **内存管理**: 定期清理过期数据，限制条目数量，防止内存泄漏
+- **Cloudflare Workers 兼容性**:
+    - 避免全局作用域使用异步操作（setInterval/setTimeout）
+    - 手动内存管理，兼容 Workers 运行时限制
+    - 优化CPU时间使用，避免超时中断
 
 ### Web UI 特性
+
+**完全模块化架构 + 苹果风格UI**
 
 - **玻璃拟态设计**: 使用 backdrop-filter 和渐变背景
 - **实时搜索**: 支持按密钥和备注搜索
@@ -139,8 +195,85 @@ WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-key node tests/test-ope
 - Anthropic: x-api-key
 - 等等...
 
+## 系统监控端点
+
+### 健康检查 `/api/health`
+
+公开端点，提供系统整体健康状态：
+
+```json
+{
+  "healthy": true,
+  "timestamp": 1692794400000,
+  "version": "1.0.0",
+  "services": {
+    "database": { "healthy": true, "responseTime": 15 },
+    "memory": { "healthy": true, "usage": {...} },
+    "errors": { "healthy": true, "recentErrors": 0 }
+  },
+  "uptime": 1250
+}
+```
+
+### 错误统计 `/api/errors`
+
+需要认证，提供错误分类和统计：
+
+```json
+{
+    "errors": [
+        { "category": "rate_limit", "provider": "google-ai-studio", "count": 5 },
+        { "category": "network", "provider": "openai", "count": 2 }
+    ]
+}
+```
+
+### 性能报告 `/api/perf`
+
+需要认证，提供实时性能统计：
+
+```
+=== Performance Stats ===
+index.fetch: 119.0ms (77.8% total, 20x calls, avg: 6.0ms)
+api.handle: 18.0ms (11.8% total, 5x calls, avg: 3.6ms)
+keyService.listActiveKeysViaCache: 16.0ms (10.5% total, 2x calls, avg: 8.0ms)
+Total Measured Time: 153.0ms
+Functions Tracked: 3
+```
+
 ## 常见调试
+
+### 开发环境调试
+
+- 检查 `pnpm dev` 启动的本地 Worker 日志
+- 使用健康检查端点 `/api/health` 验证系统状态
+- 查看性能报告 `/api/perf` 识别性能瓶颈
+- 监控错误统计 `/api/errors` 了解错误趋势
+
+### 生产环境调试
 
 - 检查 Cloudflare Workers 日志查看密钥状态变更
 - 使用 D1 控制台查看数据库状态
 - 通过 AI Gateway 分析面板监控请求统计
+- 利用系统监控端点进行健康检查和错误分析
+
+## 重要提醒
+
+程序最终会打包部署为Cloudflare Workers，注意相关的编程限制：
+
+### Cloudflare Workers 限制
+
+- **CPU 时间限制**: 每个请求最多 10ms CPU 时间（免费版）
+- **总请求时长**: 不能超过 10 秒，否则被中断
+- **内存限制**: 避免内存泄漏，实现了自动清理机制
+- **全局作用域限制**:
+    - ❌ 不能使用 `setInterval`/`setTimeout`
+    - ❌ 不能在全局作用域进行异步操作（fetch等）
+    - ✅ 已实现手动清理策略兼容这些限制
+
+### 性能优化措施
+
+- **智能缓存**: LRU+TTL 策略减少数据库查询
+- **批量操作**: 减少单次请求的操作数量
+- **异步优化**: 使用 `ctx.waitUntil()` 进行后台任务
+- **内存管理**: 定期清理过期数据，防止内存累积
