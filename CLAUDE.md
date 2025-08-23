@@ -117,6 +117,25 @@ WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-key node tests/test-ope
 - **线程安全设计**: 并发安全的429计数器和缓存操作
 - **Cloudflare Workers 兼容**: 避免全局作用域异步操作，兼容Workers运行时限制
 
+#### Web UI 性能监控系统
+
+- **数据收集与解析**:
+  - 使用 `perfMonitor.getReport()` 获取性能报告文本
+  - 正则表达式解析函数执行统计（名称、持续时间、百分比、调用次数、平均时间）
+  - `getOldestDataTimestamp()` 获取最老数据时间戳用于倒计时计算
+- **前端交互逻辑**:
+  - JavaScript 实现的1秒间隔倒计时更新
+  - 无数据时30秒间隔检查新数据产生（通过页面重载）
+  - 手动清空通过 POST 请求到 `/performance` 端点
+- **数据生命周期**:
+  - 1小时（3600000ms）数据保留时间
+  - 基于最老数据时间戳 + 1小时计算清理时间点
+  - 手动清空后重置倒计时，基于新数据产生时间开始计时
+- **UI 状态管理**:
+  - 有数据状态: 显示详细统计和倒计时
+  - 无数据状态: 显示说明文字和自动检查机制
+  - 即将清理状态: 倒计时变红色，显示"即将清理"
+
 #### OpenAI 兼容格式支持
 
 - **格式转换**: 自动将 OpenAI Chat Completions 格式转换为 Gemini 原生格式
@@ -186,6 +205,27 @@ WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-key node tests/test-ope
 - **分页和排序**: 支持多字段排序和分页显示
 - **模态详情**: 显示模型级冷却详情
 
+**实时性能监控系统**
+
+- **性能摘要面板**: 显示总执行时间、跟踪函数数、平均调用时间、最慢函数
+- **函数级性能分析**: 详细的函数执行时间统计表格，包含持续时间、百分比、调用次数、平均时间
+- **智能时间格式化**: 自动选择合适的时间单位显示
+  - < 1秒: 毫秒 (ms)
+  - < 1分钟: 秒 (s) 
+  - >= 1分钟: 分钟 (min)
+- **实时倒计时显示**: JavaScript 实现的倒计时器，显示距离自动清理的剩余时间
+- **自动状态检测**: 无数据时自动每30秒检查新数据产生
+- **手动数据管理**: 
+  - 手动清空按钮，带确认对话框防误操作
+  - 刷新按钮实时更新数据
+  - 支持 POST 请求清空数据后自动重定向
+- **数据生命周期管理**: 
+  - 1小时数据保留策略
+  - 基于最老数据时间戳的智能清理机制
+  - 清理后重新开始1小时倒计时
+- **响应式设计**: 移动端自适应网格布局
+- **Apple Design System**: 完全符合苹果设计语言的UI组件
+
 ### 提供商配置
 
 支持多种 AI 提供商，每个提供商有特定的认证头：
@@ -228,18 +268,15 @@ WORKER_URL=https://your-worker.workers.dev AUTH_KEY=your-key node tests/test-ope
 }
 ```
 
-### 性能报告 `/api/perf`
+### 性能监控 Web UI `/performance`
 
-需要认证，提供实时性能统计：
+性能监控已从 API 端点迁移到 Web UI，提供更丰富的用户界面：
 
-```
-=== Performance Stats ===
-index.fetch: 119.0ms (77.8% total, 20x calls, avg: 6.0ms)
-api.handle: 18.0ms (11.8% total, 5x calls, avg: 3.6ms)
-keyService.listActiveKeysViaCache: 16.0ms (10.5% total, 2x calls, avg: 8.0ms)
-Total Measured Time: 153.0ms
-Functions Tracked: 3
-```
+- **实时性能统计**: 显示系统性能摘要和详细函数级性能分析
+- **自动数据清理**: 1小时数据保留策略，自动清理过期数据
+- **手动清空功能**: 支持手动清空统计数据，带确认对话框防误操作
+- **实时倒计时**: 显示距离下次自动清理的剩余时间
+- **智能时间格式化**: 根据数据大小自动选择合适的时间单位（ms/s/min）
 
 ## 常见调试
 
@@ -247,7 +284,7 @@ Functions Tracked: 3
 
 - 检查 `pnpm dev` 启动的本地 Worker 日志
 - 使用健康检查端点 `/api/health` 验证系统状态
-- 查看性能报告 `/api/perf` 识别性能瓶颈
+- 访问 Web UI 性能监控页面 `/performance` 识别性能瓶颈
 - 监控错误统计 `/api/errors` 了解错误趋势
 
 ### 生产环境调试

@@ -97,19 +97,6 @@ export async function handle(request: Request, env: Env, ctx: ExecutionContext):
         const url = new URL(request.url)
         const restResource = url.pathname.substring('/api/'.length) + url.search
 
-        // 处理性能报告请求
-        if (restResource === 'perf' || restResource === 'perf/') {
-            const authKey = getAuthKeyFromHeader(request, 'openai-compat')
-            if (!util.isApiRequestAllowed(authKey, env.AUTH_KEY, 'google-ai-studio', 'gemini-2.0-flash')) {
-                return new Response('Invalid auth key', { status: 403 })
-            }
-            const report = perfMonitor.getReport()
-            return new Response(report, {
-                status: 200,
-                headers: { 'Content-Type': 'text/plain' }
-            })
-        }
-
         // 处理健康检查请求
         if (restResource === 'health' || restResource === 'health/') {
             const healthData = await generateHealthCheck(env)

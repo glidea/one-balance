@@ -15,6 +15,11 @@ If you have multiple API keys with quota limits (e.g., Google AI Studio), `One B
     - **Model-level Rate Limiting**: Accurately identifies and temporarily blocks specific models that have hit their rate limits. It can intelligently distinguish between per-minute and per-day quotas for Google AI Studio, applying different cooldown periods (e.g., a 24-hour cooldown for daily quota exhaustion).
     - **Automatic Circuit Breaking**: Permanently disables keys that are blocked by the provider (e.g., 403 errors), reducing unnecessary retries.
 - **Wide Compatibility**: Supports all API providers compatible with Cloudflare AI Gateway. This includes round-robin support for Gemini TTS, likely a unique feature on the internet (already in use at https://zenfeed.xyz for real-time news podcast generation).
+- **Real-time Performance Monitoring**: Built-in comprehensive performance monitoring system
+    - **Apple-style Web UI**: Beautiful management interface with key management and performance monitoring
+    - **Real-time Countdown**: Shows remaining time until automatic data cleanup with clear status indicators
+    - **Manual Data Clearing**: One-click performance statistics clearing with confirmation dialog to prevent accidental operations
+    - **Detailed Performance Analysis**: Function-level execution time statistics, call count analysis, and performance bottleneck identification
 
 ## Deployment Guide
 
@@ -66,6 +71,17 @@ One Balance provides a beautiful and user-friendly web management interface, bui
 ### Key Management
 
 ![Key Management](images/key-management.png)
+
+### Performance Monitoring
+
+![Performance Monitoring](images/performance-monitoring.png)
+
+## Interface Preview
+
+### Performance Monitoring Page
+<img src="images/performance-monitoring.png" alt="Performance Monitoring Interface" width="800">
+
+*The real-time performance monitoring page displays detailed system performance statistics, including countdown, manual clearing functionality, and function-level performance analysis*
 
 ## Usage
 

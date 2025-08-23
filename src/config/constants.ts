@@ -30,8 +30,8 @@ export const CONFIG = {
         },
         PERFORMANCE_MONITOR: {
             MAX_ENTRIES: 500,
-            MAX_AGE_MS: 600000, // 10分钟
-            CLEANUP_INTERVAL_MS: 120000 // 2分钟
+            MAX_AGE_MS: 3600000, // 1小时
+            CLEANUP_INTERVAL_MS: 600000 // 10分钟
         }
     },
 

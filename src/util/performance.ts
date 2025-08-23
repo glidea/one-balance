@@ -233,6 +233,19 @@ class PerformanceMonitor {
         })
     }
 
+    // 获取最老数据的时间戳，用于计算倒计时
+    getOldestDataTimestamp(): number | null {
+        if (this.entries.size === 0) return null
+        
+        let oldestTimestamp = Date.now()
+        for (const entry of this.entries.values()) {
+            if (entry.timestamp < oldestTimestamp) {
+                oldestTimestamp = entry.timestamp
+            }
+        }
+        return oldestTimestamp
+    }
+
     // 获取内存使用统计
     getMemoryStats(): { entriesCount: number; startTimesCount: number; isHealthy: boolean } {
         const entriesCount = this.entries.size
