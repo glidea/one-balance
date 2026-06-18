@@ -362,6 +362,7 @@ async function forward(
         return new Response('No active keys available', { status: 503 })
     }
 
+    const fingerprint = request.headers.get('x-conversation-fingerprint') || ''
     const body = request.body ? await request.arrayBuffer() : null
     const timeoutMs = upstreamTimeoutMs(env)
     // Bounded retries. Each key is a separate Google project, so a few attempts
@@ -377,7 +378,7 @@ async function forward(
             break
         }
 
-        const selectedKey = await selectKey(activeKeys, model)
+        const selectedKey = await selectKey(activeKeys, model, fingerprint)
         const reqToGateway = await makeGatewayRequest(
             request.method,
             request.headers,
@@ -486,13 +487,45 @@ function getAuthKeyFromHeader(request: Request, provider: string): string {
     return key
 }
 
-async function selectKey(keys: schema.Key[], model: string): Promise<schema.Key> {
-    let selectedKey = tryRandomSelect(keys, model) // fast path
-    if (selectedKey) {
-        return selectedKey
+function getDeterministicIndex(fingerprint: string, length: number): number {
+    const hexPart = fingerprint.substring(0, 8)
+    const num = parseInt(hexPart, 16)
+    return num % length
+}
+
+function tryHashedSelect(keys: schema.Key[], model: string, fingerprint: string): schema.Key | null {
+    const now = Date.now() / 1000
+    const keyIndex = getDeterministicIndex(fingerprint, keys.length)
+    const maxAttempts = Math.min(10, keys.length)
+
+    for (let i = 0; i < maxAttempts; i++) {
+        const idx = (keyIndex + i) % keys.length
+        const candidateKey = keys[idx]
+        const coolingEnd = candidateKey.modelCoolings?.[model]?.end_at
+
+        if (!coolingEnd || coolingEnd < now) {
+            console.info(`selected deterministic key ${candidateKey.id} for fingerprint ${fingerprint} (attempt: ${i + 1})`)
+            return candidateKey
+        }
     }
 
-    return selectFromAllKeys(keys, model)
+    return null
+}
+
+async function selectKey(keys: schema.Key[], model: string, fingerprint?: string): Promise<schema.Key> {
+    if (fingerprint) {
+        let selectedKey = tryHashedSelect(keys, model, fingerprint)
+        if (selectedKey) {
+            return selectedKey
+        }
+    } else {
+        let selectedKey = tryRandomSelect(keys, model) // fast path
+        if (selectedKey) {
+            return selectedKey
+        }
+    }
+
+    return selectFromAllKeys(keys, model, fingerprint)
 }
 
 function tryRandomSelect(keys: schema.Key[], model: string): schema.Key | null {
@@ -512,7 +545,7 @@ function tryRandomSelect(keys: schema.Key[], model: string): schema.Key | null {
     return null
 }
 
-function selectFromAllKeys(keys: schema.Key[], model: string): schema.Key {
+function selectFromAllKeys(keys: schema.Key[], model: string, fingerprint?: string): schema.Key {
     const now = Date.now() / 1000
     const availableKeys = []
     let bestCoolingKey: schema.Key | null = null
@@ -529,8 +562,14 @@ function selectFromAllKeys(keys: schema.Key[], model: string): schema.Key {
     }
 
     if (availableKeys.length > 0) {
-        const selectedKey = availableKeys[Math.floor(Math.random() * availableKeys.length)]
-        console.info(`selected available key ${selectedKey.id} after full scan`)
+        let selectedKey
+        if (fingerprint) {
+            const idx = getDeterministicIndex(fingerprint, availableKeys.length)
+            selectedKey = availableKeys[idx]
+        } else {
+            selectedKey = availableKeys[Math.floor(Math.random() * availableKeys.length)]
+        }
+        console.info(`selected available key ${selectedKey.id} after full scan (fingerprint: ${fingerprint})`)
         return selectedKey
     }
 
