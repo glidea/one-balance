@@ -1,34 +1,58 @@
 name: CI
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+    pull_request:
+    push:
+        branches: [main]
 
 permissions:
-  contents: read
+    contents: read
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    steps:
-      # actions/checkout v4.2.2 pinned by SHA
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          persist-credentials: false
+    check:
+        runs-on: ubuntu-latest
+        steps:
+            # actions/checkout v4.2.2 pinned by SHA
+            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+              with:
+                  persist-credentials: false
 
-      # actions/setup-node v4.1.0
-      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
-        with:
-          node-version: 22
+            # actions/setup-node v4.1.0
+            - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+              with:
+                  node-version: 22
 
-      # pnpm is pinned via package.json "packageManager"; corepack honours it.
-      - run: corepack enable
+            # pnpm is pinned via package.json "packageManager"; corepack honours it.
+            - run: corepack enable
 
-      - run: pnpm install --frozen-lockfile
+            - run: pnpm install --frozen-lockfile
 
-      - name: Typecheck (wrangler types + tsc --noEmit)
-        run: pnpm run typecheck
+            - name: Typecheck (wrangler types + tsc --noEmit)
+              run: pnpm run typecheck
 
-      - name: Test (vitest)
-        run: pnpm test
+            - name: Test (vitest)
+              run: pnpm test
+
+    smoke:
+        name: E2E smoke (live pool check)
+        needs: check
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+              with:
+                  persist-credentials: false
+
+            - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+              with:
+                  node-version: 22
+
+            - run: corepack enable
+            - run: pnpm install --frozen-lockfile
+
+            - name: E2E smoke test
+              run: node scripts/smoke.mjs
+              env:
+                  ONE_BALANCE_URL: https://one-balance.lemonesqeezy.workers.dev
+                  GEMINI_PROXY_KEY: ${{ secrets.GEMINI_PROXY_KEY }}
+                  CI_GATE: '1'
