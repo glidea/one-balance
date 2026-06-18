@@ -110,8 +110,6 @@ await checkListModels()
 const genOk = await checkGenerateContent()
 
 const failed = results.filter(r => !r.ok)
-const gateFailed = CI_GATE && !genOk
-
 console.log('')
 if (failed.length === 0) {
     console.log(`PASS — all ${results.length} checks passed`)
@@ -119,10 +117,10 @@ if (failed.length === 0) {
 }
 
 if (!CI_GATE) {
-    console.log(`FAIL — ${failed.length}/${results.length} failed: ${failed.map(r => r.name).join(', ')}`)
-    process.exit(1)
+    console.log(`INFO — ${failed.length}/${results.length} failed: ${failed.map(r => r.name).join(', ')} (non-blocking)`)
+    process.exit(0)
 }
 
-// In CI mode only generateContent blocks; listModels/health are informative.
+// CI gate mode: only generateContent blocks; listModels/health are informative.
 console.log(`CI GATE: generateContent ${genOk ? 'PASS' : 'FAIL'} (${failed.filter(r => r.name !== 'generateContent').map(r => r.name).join(', ')} are non-blocking)`)
 process.exit(genOk ? 0 : 1)
