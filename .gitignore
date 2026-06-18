@@ -211,7 +211,6 @@ vite.config.ts.timestamp-*
 src/service/d1/migrations/
 docs/
 worker-configuration.d.ts
-wrangler.jsonc
 
 # Local analysis clones (never commit sibling repos checked out inside this one)
 labpics-infra-clone/
