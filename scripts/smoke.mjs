@@ -20,8 +20,9 @@ if (!url || !key) {
     process.exit(2)
 }
 
-const RETRY_MAX = 3
-const RETRY_DELAY_MS = 5_000
+const RETRY_MAX = 5
+const RETRY_DELAY_MS = 10_000
+const CI_WARMUP_MS = 30_000
 const CI_GATE = process.env.CI_GATE === '1'
 
 const base = url.replace(/\/+$/, '')
@@ -100,6 +101,10 @@ async function checkGenerateContent() {
 }
 
 console.log(`Smoke testing ${base}`)
+if (CI_GATE) {
+    console.log(`CI warmup: waiting ${CI_WARMUP_MS / 1000}s for key cooldowns to clear...`)
+    await sleep(CI_WARMUP_MS)
+}
 await checkHealth()
 await checkListModels()
 const genOk = await checkGenerateContent()
