@@ -104,14 +104,15 @@ async function handleKeysNext(request: Request, env: Env): Promise<Response> {
         return new Response('No active keys available', { status: 503 })
     }
 
-    const selectedKey = await selectKey(activeKeys, model)
+    const fingerprint = request.headers.get('x-conversation-fingerprint') ?? undefined
+    const selectedKey = await selectKey(activeKeys, model, fingerprint)
     const cooling = selectedKey.modelCoolings?.[model]
     const coolingUntil = cooling && cooling.end_at > Date.now() / 1000 ? cooling.end_at : null
 
-    return new Response(
-        JSON.stringify({ key: selectedKey.key, id: selectedKey.id, cooling_until: coolingUntil }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
-    )
+    return new Response(JSON.stringify({ key: selectedKey.key, id: selectedKey.id, cooling_until: coolingUntil }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+    })
 }
 
 // POST /api/keys/{id}/status — body: {blocked} | {rate_limited, retry_after, model, provider} | {ok}
@@ -325,8 +326,7 @@ async function forwardListModels(
 
         // 401/403/429 are key-specific (a bad/blocked/throttled key); 5xx is a
         // transient upstream blip. Either way a different key may succeed — rotate.
-        const shouldRotate =
-            resp.status === 401 || resp.status === 403 || resp.status === 429 || resp.status >= 500
+        const shouldRotate = resp.status === 401 || resp.status === 403 || resp.status === 429 || resp.status >= 500
         if (!shouldRotate) {
             return proxyResponse(resp)
         }
@@ -504,7 +504,9 @@ function tryHashedSelect(keys: schema.Key[], model: string, fingerprint: string)
         const coolingEnd = candidateKey.modelCoolings?.[model]?.end_at
 
         if (!coolingEnd || coolingEnd < now) {
-            console.info(`selected deterministic key ${candidateKey.id} for fingerprint ${fingerprint} (attempt: ${i + 1})`)
+            console.info(
+                `selected deterministic key ${candidateKey.id} for fingerprint ${fingerprint} (attempt: ${i + 1})`
+            )
             return candidateKey
         }
     }
