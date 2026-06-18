@@ -3,6 +3,9 @@
     "name": "one-balance",
     "main": "src/index.ts",
     "compatibility_date": "2025-06-20",
+    "build": {
+        "command": "pnpm install --frozen-lockfile && pnpm run typecheck"
+    },
     "ai": {
         "binding": "AI"
     },
@@ -15,8 +18,6 @@
         }
     ],
     "vars": {
-        "AUTH_KEY": "my-auth-key",
-        "KEY_MANAGER_TOKEN": "my-key-manager-token",
         "AI_GATEWAY": "one-balance",
         "UPSTREAM_TIMEOUT_MS": "60000"
     },
