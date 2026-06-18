@@ -104,7 +104,7 @@ async function handleKeysNext(request: Request, env: Env): Promise<Response> {
         return new Response('No active keys available', { status: 503 })
     }
 
-    const fingerprint = request.headers.get('x-conversation-fingerprint') ?? undefined
+    const fingerprint = readConversationFingerprint(request)
     const selectedKey = await selectKey(activeKeys, model, fingerprint)
     const cooling = selectedKey.modelCoolings?.[model]
     const coolingUntil = cooling && cooling.end_at > Date.now() / 1000 ? cooling.end_at : null
@@ -362,7 +362,7 @@ async function forward(
         return new Response('No active keys available', { status: 503 })
     }
 
-    const fingerprint = request.headers.get('x-conversation-fingerprint') || ''
+    const fingerprint = readConversationFingerprint(request)
     const body = request.body ? await request.arrayBuffer() : null
     const timeoutMs = upstreamTimeoutMs(env)
     // Bounded retries. Each key is a separate Google project, so a few attempts
@@ -487,9 +487,51 @@ function getAuthKeyFromHeader(request: Request, provider: string): string {
     return key
 }
 
+// Bifrost forwards the conversation fingerprint under the DE-PREFIXED name
+// `conversation-fingerprint` (it strips the `x-bf-eh-` prefix ai-node sends).
+// Prefer that name; fall back to the legacy `x-conversation-fingerprint` for
+// backward compatibility. Centralized so both vend sites stay in sync — reading
+// the wrong name silently degrades consistent-hash selection to RANDOM.
+function readConversationFingerprint(request: Request): string | undefined {
+    return (
+        request.headers.get('conversation-fingerprint') ??
+        request.headers.get('x-conversation-fingerprint') ??
+        undefined
+    )
+}
+
+// A fingerprint is usable for consistent hashing only if the WHOLE string is hex
+// of a sane length. Anchoring matters for two reasons:
+//   1. Correctness: empty/non-hex values make parseInt() return NaN, and
+//      `NaN % len` is NaN → keys[NaN] is undefined → crash.
+//   2. Log-injection (defense): an UNANCHORED prefix regex (/^[0-9a-fA-F]{8}/)
+//      accepts anything that merely starts with 8 hex chars, so a forged suffix
+//      laced with control chars would be accepted AND logged verbatim, letting a
+//      caller forge log lines. Requiring the full string be hex (8..128 chars —
+//      SHA-256 is 64 hex, the band tolerates other hashes) rejects such inputs,
+//      which then fall back to random selection.
+const FINGERPRINT_HEX = /^[0-9a-fA-F]{8,128}$/
+
+function isUsableFingerprint(fingerprint: string | undefined): fingerprint is string {
+    return !!fingerprint && FINGERPRINT_HEX.test(fingerprint)
+}
+
+// Never log a raw fingerprint: even a validated one is logged only as a short,
+// fixed-length slice so a hostile or malformed header value can never inject
+// newlines/control chars into the log stream. Defense in depth — the validator
+// already rejects non-hex, but the log sites must be safe on their own.
+function safeFingerprint(fingerprint: string | undefined): string {
+    return fingerprint ? fingerprint.slice(0, 8) : '(none)'
+}
+
 function getDeterministicIndex(fingerprint: string, length: number): number {
     const hexPart = fingerprint.substring(0, 8)
     const num = parseInt(hexPart, 16)
+    // Defense in depth: callers gate on isUsableFingerprint, but never let a
+    // bad value yield NaN here (NaN % len = NaN → keys[NaN] = undefined → crash).
+    if (Number.isNaN(num)) {
+        return 0
+    }
     return num % length
 }
 
@@ -505,7 +547,7 @@ function tryHashedSelect(keys: schema.Key[], model: string, fingerprint: string)
 
         if (!coolingEnd || coolingEnd < now) {
             console.info(
-                `selected deterministic key ${candidateKey.id} for fingerprint ${fingerprint} (attempt: ${i + 1})`
+                `selected deterministic key ${candidateKey.id} for fingerprint ${safeFingerprint(fingerprint)} (attempt: ${i + 1})`
             )
             return candidateKey
         }
@@ -515,8 +557,13 @@ function tryHashedSelect(keys: schema.Key[], model: string, fingerprint: string)
 }
 
 async function selectKey(keys: schema.Key[], model: string, fingerprint?: string): Promise<schema.Key> {
-    if (fingerprint) {
-        let selectedKey = tryHashedSelect(keys, model, fingerprint)
+    // Only an empty-or-non-hex fingerprint degrades to random; a usable one pins
+    // a key by consistent hash so a conversation sticks to the same key (sharing
+    // its rate-limit budget) instead of fanning out across the pool.
+    const hashable = isUsableFingerprint(fingerprint) ? fingerprint : undefined
+
+    if (hashable) {
+        let selectedKey = tryHashedSelect(keys, model, hashable)
         if (selectedKey) {
             return selectedKey
         }
@@ -527,7 +574,7 @@ async function selectKey(keys: schema.Key[], model: string, fingerprint?: string
         }
     }
 
-    return selectFromAllKeys(keys, model, fingerprint)
+    return selectFromAllKeys(keys, model, hashable)
 }
 
 function tryRandomSelect(keys: schema.Key[], model: string): schema.Key | null {
@@ -571,7 +618,9 @@ function selectFromAllKeys(keys: schema.Key[], model: string, fingerprint?: stri
         } else {
             selectedKey = availableKeys[Math.floor(Math.random() * availableKeys.length)]
         }
-        console.info(`selected available key ${selectedKey.id} after full scan (fingerprint: ${fingerprint})`)
+        console.info(
+            `selected available key ${selectedKey.id} after full scan (fingerprint: ${safeFingerprint(fingerprint)})`
+        )
         return selectedKey
     }
 
@@ -588,6 +637,7 @@ async function makeGatewayRequest(
     key: string
 ): Promise<Request> {
     const newHeaders = new Headers(headers)
+    stripInternalRoutingHeaders(newHeaders)
     setAuthHeader(newHeaders, restResource, key)
 
     const selected = selectGateway(env)
@@ -603,6 +653,24 @@ async function makeGatewayRequest(
         body: body,
         redirect: 'follow'
     })
+}
+
+// Internal routing headers used only for in-worker key selection. They must NOT
+// leak to the upstream provider (Google / AI Gateway): selection has already run
+// by the time we build the upstream request, so they carry no further meaning and
+// forwarding them needlessly exposes our routing scheme. Body is passed and sent
+// separately, so stripping headers never mutates the forwarded request body.
+function stripInternalRoutingHeaders(headers: Headers): void {
+    headers.delete('conversation-fingerprint')
+    headers.delete('x-conversation-fingerprint')
+    // ai-node sends the fingerprint (and any future routing hints) under the
+    // x-bf-eh-* family; Bifrost strips the prefix, but defend against any that
+    // reach us prefixed. Header names are case-insensitive in the Headers API.
+    for (const name of [...headers.keys()]) {
+        if (name.toLowerCase().startsWith('x-bf-eh-')) {
+            headers.delete(name)
+        }
+    }
 }
 
 function selectGateway(env: Env): string {
