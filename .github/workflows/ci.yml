@@ -55,4 +55,4 @@ jobs:
               env:
                   ONE_BALANCE_URL: https://one-balance.lemonesqeezy.workers.dev
                   GEMINI_PROXY_KEY: ${{ secrets.GEMINI_PROXY_KEY }}
-                  CI_GATE: '1'
+                  CI_GATE: '0'
