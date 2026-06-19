@@ -68,7 +68,8 @@ function checkKeyManagerAuth(request: Request, env: Env): Response | null {
         return new Response('KEY_MANAGER_TOKEN not configured', { status: 500 })
     }
     const auth = request.headers.get('Authorization') ?? ''
-    if (auth !== `Bearer ${token}`) {
+    // Constant-time compare: the KEY_MANAGER_TOKEN bearer must not leak via timing.
+    if (!util.timingSafeEqual(auth, `Bearer ${token}`)) {
         return new Response('Unauthorized', { status: 401 })
     }
     return null
