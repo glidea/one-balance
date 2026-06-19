@@ -3,9 +3,6 @@
     "name": "one-balance",
     "main": "src/index.ts",
     "compatibility_date": "2025-06-20",
-    "build": {
-        "command": "pnpm install --frozen-lockfile && pnpm run typecheck"
-    },
     "ai": {
         "binding": "AI"
     },
