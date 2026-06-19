@@ -1,6 +1,7 @@
 import * as keyService from './service/key'
 import * as util from './util'
 import type * as schema from './service/d1/schema'
+import { CONVERSATION_FINGERPRINT_CORE, BIFROST_ECHO_PREFIX, LEGACY_FINGERPRINT_HEADER } from './contract'
 
 const PROVIDER_CUSTOM_AUTH_HEADER: Record<string, string> = {
     'google-ai-studio': 'x-goog-api-key',
@@ -494,8 +495,8 @@ function getAuthKeyFromHeader(request: Request, provider: string): string {
 // the wrong name silently degrades consistent-hash selection to RANDOM.
 function readConversationFingerprint(request: Request): string | undefined {
     return (
-        request.headers.get('conversation-fingerprint') ??
-        request.headers.get('x-conversation-fingerprint') ??
+        request.headers.get(CONVERSATION_FINGERPRINT_CORE) ??
+        request.headers.get(LEGACY_FINGERPRINT_HEADER) ??
         undefined
     )
 }
@@ -661,13 +662,13 @@ async function makeGatewayRequest(
 // forwarding them needlessly exposes our routing scheme. Body is passed and sent
 // separately, so stripping headers never mutates the forwarded request body.
 function stripInternalRoutingHeaders(headers: Headers): void {
-    headers.delete('conversation-fingerprint')
-    headers.delete('x-conversation-fingerprint')
+    headers.delete(CONVERSATION_FINGERPRINT_CORE)
+    headers.delete(LEGACY_FINGERPRINT_HEADER)
     // ai-node sends the fingerprint (and any future routing hints) under the
     // x-bf-eh-* family; Bifrost strips the prefix, but defend against any that
     // reach us prefixed. Header names are case-insensitive in the Headers API.
     for (const name of [...headers.keys()]) {
-        if (name.toLowerCase().startsWith('x-bf-eh-')) {
+        if (name.toLowerCase().startsWith(BIFROST_ECHO_PREFIX)) {
             headers.delete(name)
         }
     }

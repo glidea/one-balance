@@ -1,0 +1,81 @@
+name: Cache canary
+
+# ── The cache-correctness gate (NOT the liveness gate) ──────────────────────
+# The cheap `smoke` job in ci.yml answers "is the deployed chain ALIVE?" on
+# every push to main. THIS canary answers a deeper question the smoke cannot:
+# "is Gemini's implicit context cache actually WARMING end-to-end through
+# ai-node → Bifrost → one-balance → Gemini?" (стержень #12, the keystone).
+#
+# It is deliberately OFF the pull_request path — it costs real tokens against
+# the live pool and depends on deployed infra, so it runs on a SCHEDULE and
+# after a deploy, never blocking a PR (Ch4 de-theater: smoke = liveness gate,
+# canary = cache-correctness gate, on different cadences).
+#
+# ── REQUIRED SECRET: PROBE_VK ───────────────────────────────────────────────
+# scripts/canary-cache.mjs authenticates to ai-node with an ai-node Virtual Key
+# read from the PROBE_VK secret. Until that repo secret is added, this job
+# SKIPS GRACEFULLY (prints a notice, exits 0) — it never hard-fails for a
+# missing secret. Add it under: Settings → Secrets and variables → Actions →
+# New repository secret → name PROBE_VK, value = an ai-node VK.
+
+on:
+    # Daily scheduled run — the steady-state cache health check.
+    schedule:
+        - cron: '17 6 * * *' # 06:17 UTC daily (off the top of the hour to dodge runner congestion)
+    # Manual trigger for on-demand verification / debugging.
+    workflow_dispatch:
+    # Post-deploy: run after the CI workflow finishes on main (i.e. after a
+    # deploy), so a config/header change that breaks caching is caught promptly
+    # rather than waiting for the next daily tick.
+    workflow_run:
+        workflows: ['CI']
+        types: [completed]
+        branches: [main]
+
+permissions:
+    contents: read
+
+jobs:
+    canary:
+        name: Cache-warm canary (deployed chain)
+        runs-on: ubuntu-latest
+        # On the post-deploy (workflow_run) trigger, only run if the upstream CI
+        # actually succeeded — no point probing a deploy that failed to ship.
+        if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+        steps:
+            # actions/checkout v4.2.2 pinned by SHA (matches ci.yml)
+            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+              with:
+                  persist-credentials: false
+
+            # actions/setup-node v4.1.0 (matches ci.yml)
+            - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af
+              with:
+                  node-version: 22
+
+            # Gate on the secret BEFORE doing any work. A job-level `if:` cannot
+            # read `secrets.*`, so we surface its presence as a step output and
+            # let the run step skip gracefully when it is absent.
+            - name: Check PROBE_VK presence
+              id: probe
+              env:
+                  PROBE_VK: ${{ secrets.PROBE_VK }}
+              run: |
+                  if [ -z "${PROBE_VK:-}" ]; then
+                      echo "::notice::PROBE_VK secret is not set — skipping the cache canary (not a failure). Add an ai-node VK as the PROBE_VK repo secret to activate it."
+                      echo "present=false" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "present=true" >> "$GITHUB_OUTPUT"
+                  fi
+
+            # The canary script needs no dependencies (pure Node fetch), so we run
+            # it directly — no install step. Only runs when PROBE_VK is present.
+            - name: Run cache-warm canary
+              if: steps.probe.outputs.present == 'true'
+              env:
+                  PROBE_VK: ${{ secrets.PROBE_VK }}
+                  # Optional overrides; the script has documented defaults.
+                  AI_NODE_URL: ${{ vars.AI_NODE_URL }}
+                  CANARY_MODEL: ${{ vars.CANARY_MODEL }}
+                  CANARY_TURNS: ${{ vars.CANARY_TURNS }}
+              run: node scripts/canary-cache.mjs

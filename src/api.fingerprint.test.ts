@@ -179,6 +179,42 @@ describe('conversation-fingerprint → consistent-hash key selection', () => {
         }
     })
 
+    it('(neg) STILL-PREFIXED `x-bf-eh-conversation-fingerprint` does NOT drive hash → random fallback', async () => {
+        // The wire contract: ai-node EMITS `x-bf-eh-conversation-fingerprint`,
+        // Bifrost STRIPS the `x-bf-eh-` prefix, one-balance READS the de-prefixed
+        // `conversation-fingerprint`. If Bifrost ever fails to strip (or a partial
+        // rename ships), one-balance would receive the STILL-PREFIXED name. That
+        // name must NOT be read as a fingerprint — selection silently degrades to
+        // RANDOM (no 4xx, no log) rather than pinning every conversation onto one
+        // key. This negative case is the consumer-side seal of the drift class:
+        // only the exact de-prefixed name pins; the prefixed one spreads.
+        const ids = new Set<string>()
+        for (let i = 0; i < 30; i++) {
+            const picked = await vend({ 'x-bf-eh-conversation-fingerprint': FP_TO_KEY2 })
+            expect(picked.id).toMatch(/^key-/)
+            ids.add(picked.id)
+        }
+        // De-prefixed FP_TO_KEY2 pins exactly key-2 (test a/b). The prefixed name
+        // is invisible to readConversationFingerprint → random over 3 keys × 30
+        // draws hits >1 distinct id with overwhelming probability. Pinned-to-one
+        // would mean the prefixed header WAS (wrongly) read as a fingerprint.
+        expect(ids.size).toBeGreaterThan(1)
+    })
+
+    it('(neg2) de-prefixed name pins while the prefixed name alone does not (positive vs negative, same value)', async () => {
+        // Same fingerprint value, two header names: the de-prefixed name pins to
+        // the deterministic key; the still-prefixed name does not. Proves the
+        // distinction is the NAME, not the value.
+        const dePrefixed = await vend({ 'conversation-fingerprint': FP_TO_KEY2 })
+        expect(dePrefixed.id).toBe(EXPECTED_KEY_FOR_FP)
+
+        const prefixedIds = new Set<string>()
+        for (let i = 0; i < 30; i++) {
+            prefixedIds.add((await vend({ 'x-bf-eh-conversation-fingerprint': FP_TO_KEY2 })).id)
+        }
+        expect(prefixedIds.size).toBeGreaterThan(1)
+    })
+
     it('(d) backward-compat: legacy `x-conversation-fingerprint` still selects via hash', async () => {
         const picked = await vend({ 'x-conversation-fingerprint': FP_TO_KEY2 })
         expect(picked.id).toBe(EXPECTED_KEY_FOR_FP)
@@ -193,5 +229,95 @@ describe('conversation-fingerprint → consistent-hash key selection', () => {
             'x-conversation-fingerprint': FP_TO_KEY2 // → key-2
         })
         expect(picked.id).toBe('key-3')
+    })
+})
+
+// ─── Pinned-key-cooling probe resilience (стержень #11, Class C fault) ───────
+// The consistent-hash pins a conversation to ONE deterministic key. When that
+// exact key is cooling (modelCoolings[model].end_at in the future), selection
+// must NOT crash and must NOT keep serving the cooling key: tryHashedSelect
+// linear-probes forward to the next AVAILABLE key. When EVERY key is cooling,
+// selectFromAllKeys must return the EARLIEST-RECOVERING key (min end_at) —
+// never undefined (the `bestCoolingKey!` deref would crash on undefined). These
+// two faults are the linear-probe's whole reason to exist; this seals them.
+describe('pinned-key cooling → linear-probe resilience', () => {
+    // FP_TO_KEY2 (0x04 % 3 = 1) pins index 1 = key-2. We inject cooldowns onto a
+    // fresh pool per call so the deterministic pick (key-2) is the one cooling.
+    const FUTURE = () => Date.now() / 1000 + 600 // 10 min out — comfortably "cooling"
+    const SOON = () => Date.now() / 1000 + 30 // recovers first
+    const LATER = () => Date.now() / 1000 + 900 // recovers last
+
+    function vendWithCoolings(
+        coolings: Record<string, number>, // keyId → end_at (absent = available)
+        headers: Record<string, string>
+    ) {
+        ;(keyService.listActiveKeysViaCache as any).mockImplementation(async () =>
+            POOL.map(k => ({
+                ...k,
+                modelCoolings: coolings[k.id]
+                    ? { 'gemini-2.5-flash': { total_seconds: 0, end_at: coolings[k.id] } }
+                    : {}
+            }))
+        )
+        const req = new Request('https://ob/api/keys/next?provider=google-ai-studio&model=gemini-2.5-flash', {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${KEY_MANAGER_TOKEN}`, ...headers }
+        })
+        return handle(req, makeEnv(), makeCtx())
+    }
+
+    it('deterministic key cooling → linear-probe selects the NEXT available key, no crash', async () => {
+        // key-2 is the deterministic pick for FP_TO_KEY2 but it is cooling.
+        // tryHashedSelect probes idx 1 (key-2, cooling) → idx 2 (key-3, available).
+        const res = await vendWithCoolings({ 'key-2': FUTURE() }, { 'conversation-fingerprint': FP_TO_KEY2 })
+        expect(res.status).toBe(200)
+        const body = (await res.json()) as { id: string; key: string; cooling_until: number | null }
+        // Must NOT serve the cooling pinned key; must land on an available one.
+        expect(body.id).not.toBe('key-2')
+        expect(body.id).toBe('key-3')
+        expect(body.key).toBe('secret-3')
+        // The chosen key (key-3) is not cooling → cooling_until is null.
+        expect(body.cooling_until).toBeNull()
+    })
+
+    it('deterministic + its next probe both cooling → probes onward to the only available key', async () => {
+        // key-2 (idx 1) and key-3 (idx 2) cooling → wrap to idx 0 = key-1 available.
+        const res = await vendWithCoolings(
+            { 'key-2': FUTURE(), 'key-3': FUTURE() },
+            { 'conversation-fingerprint': FP_TO_KEY2 }
+        )
+        expect(res.status).toBe(200)
+        const body = (await res.json()) as { id: string; cooling_until: number | null }
+        expect(body.id).toBe('key-1')
+        expect(body.cooling_until).toBeNull()
+    })
+
+    it('ALL keys cooling → returns the EARLIEST-recovering key (no undefined deref)', async () => {
+        // Every key cooling: key-1 recovers SOON, key-2 LATER, key-3 FUTURE.
+        // selectFromAllKeys finds nothing available and must return the key whose
+        // end_at is smallest (key-1) — never undefined.
+        const res = await vendWithCoolings(
+            { 'key-1': SOON(), 'key-2': LATER(), 'key-3': FUTURE() },
+            { 'conversation-fingerprint': FP_TO_KEY2 }
+        )
+        expect(res.status).toBe(200)
+        const body = (await res.json()) as { id: string; key: string; cooling_until: number | null }
+        // Earliest-recovering wins regardless of which one the hash pinned.
+        expect(body.id).toBe('key-1')
+        expect(body.key).toBe('secret-1')
+        // The returned key IS still cooling → cooling_until is its future end_at.
+        expect(body.cooling_until).not.toBeNull()
+        expect(body.cooling_until!).toBeGreaterThan(Date.now() / 1000)
+    })
+
+    it('ALL keys cooling, no fingerprint → still returns earliest-recovering key, no crash', async () => {
+        // The random path (no fingerprint) also routes through selectFromAllKeys
+        // when nothing is available; it must likewise return the earliest key, not
+        // undefined. Proves the resilience is not specific to the hashed path.
+        const res = await vendWithCoolings({ 'key-1': LATER(), 'key-2': SOON(), 'key-3': FUTURE() }, {})
+        expect(res.status).toBe(200)
+        const body = (await res.json()) as { id: string; cooling_until: number | null }
+        expect(body.id).toBe('key-2') // earliest end_at
+        expect(body.cooling_until).not.toBeNull()
     })
 })

@@ -472,6 +472,88 @@ describe('upstream timeout (AbortController → 504 + Retry-After)', () => {
     })
 })
 
+// ─── internal routing header leak guard (стержень #8) ───────────────────────
+// Internal routing headers used only for in-worker key selection must NEVER
+// reach the upstream provider (Google / AI Gateway): selection has already run
+// by the time the upstream request is built, so they carry no further meaning
+// and forwarding them needlessly exposes our routing scheme. stripInternalRouting
+// Headers is 0%-covered today — a deleted delete() ships green. This pins it.
+
+describe('internal routing header leak guard (never forwarded upstream)', () => {
+    it('strips conversation-fingerprint, x-conversation-fingerprint, and x-bf-eh-* before the gateway fetch', async () => {
+        // Capture the EXACT headers on the upstream request the worker builds.
+        let upstream: Headers | undefined
+        const fetchMock = vi.fn(async (req: Request) => {
+            upstream = req.headers
+            return new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } })
+        })
+        vi.stubGlobal('fetch', fetchMock)
+
+        const req = new Request('https://ob/api/compat/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${AUTH_KEY}`,
+                'Content-Type': 'application/json',
+                // The three internal routing header shapes that must be stripped:
+                'conversation-fingerprint': '00000004deadbeefcafef00d',
+                'x-conversation-fingerprint': '00000004deadbeefcafef00d',
+                // An arbitrary x-bf-eh-* member (mixed-case to prove case-insensitive strip).
+                'X-Bf-Eh-Conversation-Fingerprint': '00000004deadbeefcafef00d'
+            },
+            body: JSON.stringify({ model: 'google-ai-studio/gemini-2.5-flash', messages: [] })
+        })
+
+        const res = await handle(req, makeEnv(), makeCtx())
+        expect(res.status).toBe(200)
+        expect(fetchMock).toHaveBeenCalledTimes(1)
+        expect(upstream).toBeDefined()
+
+        // Headers.get is case-insensitive — each internal routing header is ABSENT.
+        expect(upstream!.get('conversation-fingerprint')).toBeNull()
+        expect(upstream!.get('CONVERSATION-FINGERPRINT')).toBeNull()
+        expect(upstream!.get('x-conversation-fingerprint')).toBeNull()
+        expect(upstream!.get('x-bf-eh-conversation-fingerprint')).toBeNull()
+
+        // Belt and braces: NO header whose lowercased name is one of the internal
+        // routing names — or starts with the x-bf-eh- prefix — survives upstream.
+        const leaked = [...upstream!.keys()].filter(
+            n =>
+                n.toLowerCase() === 'conversation-fingerprint' ||
+                n.toLowerCase() === 'x-conversation-fingerprint' ||
+                n.toLowerCase().startsWith('x-bf-eh-')
+        )
+        expect(leaked).toEqual([])
+    })
+
+    it('still forwards a benign header (proves the strip is targeted, not a blanket wipe)', async () => {
+        // The guard must remove ONLY internal routing headers — an ordinary header
+        // (here the auth header the gateway needs) must still reach upstream.
+        let upstream: Headers | undefined
+        const fetchMock = vi.fn(async (req: Request) => {
+            upstream = req.headers
+            return new Response('{"ok":true}', { status: 200, headers: { 'Content-Type': 'application/json' } })
+        })
+        vi.stubGlobal('fetch', fetchMock)
+
+        const req = new Request('https://ob/api/compat/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${AUTH_KEY}`,
+                'Content-Type': 'application/json',
+                'conversation-fingerprint': '00000004deadbeefcafef00d'
+            },
+            body: JSON.stringify({ model: 'google-ai-studio/gemini-2.5-flash', messages: [] })
+        })
+        const res = await handle(req, makeEnv(), makeCtx())
+        expect(res.status).toBe(200)
+        expect(upstream!.get('conversation-fingerprint')).toBeNull()
+        // The compat proxy path authenticates upstream via the Authorization header,
+        // carrying the pooled key (secret-*). It survives the strip — proving the
+        // guard removes only internal routing headers, not the request wholesale.
+        expect(upstream!.get('Authorization')).toMatch(/^Bearer secret-/)
+    })
+})
+
 // ─── content-disposition stripping on proxied responses ─────────────────────
 
 describe('content-disposition stripping', () => {

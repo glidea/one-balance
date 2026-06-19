@@ -33,6 +33,72 @@ jobs:
             - name: Test (vitest)
               run: pnpm test
 
+            # ── Conversation-fingerprint wire-contract guard ─────────────────
+            # The header wire-string is the seam between ai-node (emitter) and
+            # one-balance (reader). A partial rename silently degrades routing to
+            # RANDOM — no 4xx, no log. tests/contracts/conversation-fingerprint.json
+            # is the golden shared with ai-node; contract.test.ts already pins our
+            # TS consts to it. This step adds two guards:
+            #   1. Always-on: this repo's fixture bytes must match the canonical
+            #      SHA256, so an edit to the fixture itself drifts loudly (no silent
+            #      retag). This is an IN-REPO byte guard — it does not require the
+            #      two repos to format their copies identically.
+            #   2. Best-effort cross-repo: when AI_NODE_CONTRACT_TOKEN is set AND the
+            #      sibling copy exists, fetch it via `gh api` raw and diff it against
+            #      ours after NORMALIZING with `jq -S -c` (sorted keys, no
+            #      whitespace). The contract is the wire STRINGS, not the byte layout:
+            #      ai-node publishes a pretty-printed copy and one-balance a minified
+            #      one, so a raw byte diff here would false-positive on formatting
+            #      alone. ai-node's reciprocal guard (build.yml) normalizes the same
+            #      way; the two guards must agree or one repo blocks while the other
+            #      passes on the identical contract. ai-node is a PRIVATE sibling in
+            #      the same org, so the default GITHUB_TOKEN cannot read it — a
+            #      cross-repo read-only PAT is needed. Until that secret + the sibling
+            #      file land, this leg is a no-op (it never blocks the PR), and the
+            #      SSOT doc is the documented guard.
+            #      See: tests/contracts/conversation-fingerprint.md (SSOT) + FLAG.
+            - name: Contract guard (fingerprint wire-string)
+              env:
+                  AI_NODE_CONTRACT_TOKEN: ${{ secrets.AI_NODE_CONTRACT_TOKEN }}
+              run: |
+                  set -euo pipefail
+                  FIXTURE=tests/contracts/conversation-fingerprint.json
+                  EXPECTED_SHA=b29d9621141dca5615df614863a7ca7ba757fd685a6f8bcc85f1d91fb64b1495
+
+                  # (1) Always-on, IN-REPO byte guard: this repo's fixture must match
+                  #     the canonical SHA256 so an edit can't silently retag it. This
+                  #     pins one-balance's own copy; it does NOT require the sibling to
+                  #     format its copy identically (see the semantic diff in step 2).
+                  ACTUAL_SHA=$(sha256sum "$FIXTURE" | cut -d' ' -f1)
+                  if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+                      echo "::error file=$FIXTURE::contract fixture drifted (sha $ACTUAL_SHA != $EXPECTED_SHA). Update the consts, the SSOT doc, and ai-node in the SAME PR."
+                      exit 1
+                  fi
+                  echo "contract fixture matches canonical sha256."
+
+                  # (2) Best-effort cross-repo SEMANTIC diff against the ai-node sibling.
+                  if [ -z "${AI_NODE_CONTRACT_TOKEN:-}" ]; then
+                      echo "::notice::AI_NODE_CONTRACT_TOKEN not set — skipping cross-repo diff (SSOT doc is the guard until the PAT + sibling copy land)."
+                      exit 0
+                  fi
+                  SIBLING=$(GH_TOKEN="$AI_NODE_CONTRACT_TOKEN" gh api \
+                      -H "Accept: application/vnd.github.raw+json" \
+                      "repos/Labpics-Team/ai-node/contents/tests/contracts/conversation-fingerprint.json" 2>/dev/null || true)
+                  if [ -z "$SIBLING" ]; then
+                      echo "::notice::ai-node sibling copy not found yet — skipping cross-repo diff (non-blocking)."
+                      exit 0
+                  fi
+                  # Normalize both copies (sorted keys, no whitespace) before diffing.
+                  # The contract is the wire STRINGS, not the byte layout: ai-node is
+                  # pretty-printed, one-balance is minified, and ai-node's build.yml
+                  # normalizes the same way. A raw byte diff here would false-positive
+                  # on formatting and block this repo while ai-node passes.
+                  if ! diff <(printf '%s' "$SIBLING" | jq -S -c .) <(jq -S -c . "$FIXTURE"); then
+                      echo "::error::cross-repo contract drift: ai-node copy != one-balance $FIXTURE. The fingerprint wire strings diverged — update both copies + the SSOT doc in lockstep."
+                      exit 1
+                  fi
+                  echo "cross-repo contract matches ai-node (semantic, key-order + whitespace agnostic)."
+
     smoke:
         name: E2E smoke (live pool check)
         needs: check
