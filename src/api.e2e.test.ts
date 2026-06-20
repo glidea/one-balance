@@ -9,7 +9,7 @@ vi.mock('./service/key', () => ({
 }))
 
 import * as keyService from './service/key'
-import { handle } from './api'
+import { handle, DEFAULT_UPSTREAM_TIMEOUT_MS, BIFROST_TIMEOUT_MS } from './api'
 import worker from './index'
 
 const KEY_MANAGER_TOKEN = 'kmt-test'
@@ -470,6 +470,17 @@ describe('upstream timeout (AbortController → 504 + Retry-After)', () => {
         // Consuming the body waits for the delayed chunk; it must arrive intact.
         expect(await res.json()).toEqual({ late: true })
     })
+
+    // Timeout-inversion guard: one-balance's default upstream timeout MUST sit
+    // strictly above Bifrost's 60s so the CALLER's timer always owns timeouts and
+    // the two never race. If someone "rounds" the default back down to 60s (or
+    // below), this fails and explains why — preventing the inverted failure where
+    // the inner proxy reports a timeout that belongs to the outer gateway.
+    it('default upstream timeout outlasts Bifrost (no inverted timeout race)', () => {
+        expect(DEFAULT_UPSTREAM_TIMEOUT_MS).toBeGreaterThan(BIFROST_TIMEOUT_MS)
+        expect(DEFAULT_UPSTREAM_TIMEOUT_MS).toBe(65_000)
+        expect(BIFROST_TIMEOUT_MS).toBe(60_000)
+    })
 })
 
 // ─── internal routing header leak guard (стержень #8) ───────────────────────
@@ -597,6 +608,282 @@ describe('content-disposition stripping', () => {
         const res = await handle(req, makeEnv(), makeCtx())
         expect(res.status).toBe(200)
         expect(res.headers.get('set-cookie')).toBeNull()
+    })
+})
+
+// ─── honest exhausted-pool error bodies (429 / 502) ─────────────────────────
+// The retry loop surfaces an honest body once retries run out. Two invariants
+// these goldens enforce:
+//   1. NO POOL-COMPOSITION LEAK (FIX A — info disclosure). ai-node proxies the
+//      upstream body VERBATIM to the virtual-key holder, who may have bought a
+//      shared VK. The CLIENT body must teach the CAUSE and the ACTION, but never
+//      the backend's capacity/health: no exact active-pool size (M), no
+//      blocked/cooling counts, no "N of M active keys". Those numbers live ONLY
+//      in the operator log (console.warn), across the trust boundary.
+//   2. NO SOFT-LIES (FIX B). The 429 "each returned 429" claim must count the
+//      ACTUAL 429s (cooledThisRun), not every probed key (which includes
+//      401/403-blocked and 5xx). The 502 "all returned 5xx" claim holds only
+//      when no key was blocked this run; otherwise it is softened.
+
+// Capture operator-facing console.warn lines so a test can assert the raw pool
+// composition is logged server-side (for operators) even though it is withheld
+// from the client body. Returns the joined warn output during `fn`.
+async function captureWarn(fn: () => Promise<void>): Promise<string> {
+    const lines: string[] = []
+    const spy = vi.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
+        lines.push(args.map(String).join(' '))
+    })
+    try {
+        await fn()
+    } finally {
+        spy.mockRestore()
+    }
+    return lines.join('\n')
+}
+
+// The exact pool-composition shapes that must NEVER reach the client body.
+// `/Pool: \d+ active/` is the literal breakdown the old body leaked; the
+// "N of M active … keys" pair is the capacity disclosure FIX A removes.
+const POOL_BREAKDOWN_LEAK = /Pool:\s*\d+\s*active/i
+const N_OF_M_LEAK = /\d+\s+of\s+\d+\s+active/i
+
+describe('honest 429 body when the bounded retry loop exhausts the pool', () => {
+    const proxyReq = () =>
+        new Request('https://ob/api/compat/v1/chat/completions', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${AUTH_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: 'google-ai-studio/gemini-2.5-flash', messages: [] })
+        })
+
+    // A per-minute (TPM/RetryInfo) 429 — rotation can NEVER fix an oversized
+    // per-minute request, so the body must say so, not "all keys cooling down".
+    const perMinute429 = () =>
+        new Response(
+            JSON.stringify({
+                error: {
+                    code: 429,
+                    details: [{ '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '30s' }]
+                }
+            }),
+            { status: 429 }
+        )
+
+    // A per-day (RPD) 429 — here rotation across projects genuinely helps; the
+    // body must classify the cause as per-day RPD exhaustion, not per-minute.
+    const perDay429 = () =>
+        new Response(
+            JSON.stringify({
+                error: {
+                    code: 429,
+                    details: [
+                        {
+                            '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+                            violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier' }]
+                        }
+                    ]
+                }
+            }),
+            { status: 429 }
+        )
+
+    it('drops the old lying literal "all attempted keys are cooling down"', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => perMinute429())
+        )
+        const res = await handle(proxyReq(), makeEnv(), makeCtx())
+        expect(res.status).toBe(429)
+        const body = await res.text()
+        expect(body).not.toContain('all attempted keys are cooling down')
+    })
+
+    it('per-minute/TPM cause: names the per-minute/oversize cause and that rotation will NOT help — WITHOUT leaking pool numbers', async () => {
+        const fetchMock = vi.fn(async () => perMinute429())
+        vi.stubGlobal('fetch', fetchMock)
+        const res = await handle(proxyReq(), makeEnv(), makeCtx())
+
+        expect(res.status).toBe(429)
+        expect(res.headers.get('Retry-After')).toBe('32') // 30 + 2s buffer, preserved
+        const body = await res.text()
+
+        // ── ACTIONABLE TRUTH kept in the client body ──
+        // true cause: per-minute TPM / oversized request for free tier.
+        expect(body).toMatch(/per-minute|TPM/i)
+        expect(body).toMatch(/too large|oversized|compact/i)
+        // rotation across more keys will NOT help an oversized per-minute request.
+        expect(body).toMatch(/rotation.*will not help/i)
+        // Retry-After echoed in the body too.
+        expect(body).toMatch(/Retry-After: ?32/i)
+
+        // ── FIX A: pool composition is WITHHELD from the client ──
+        // No exact active-pool size, no blocked/cooling breakdown, no "N of M".
+        expect(body).not.toMatch(POOL_BREAKDOWN_LEAK)
+        expect(body).not.toMatch(N_OF_M_LEAK)
+        // The specific count words tied to capacity must not appear as a breakdown.
+        expect(body).not.toMatch(/\d+\s+blocked/i)
+        expect(body).not.toMatch(/\d+\s+cooling/i)
+        expect(body).not.toMatch(/\d+\s+active/i)
+    })
+
+    it('FIX A: operator log carries the raw pool composition the client body withholds', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => perMinute429())
+        )
+        let body = ''
+        const warn = await captureWarn(async () => {
+            const res = await handle(proxyReq(), makeEnv(), makeCtx())
+            body = await res.text()
+        })
+        // The operator sees the capacity/health the client never does.
+        expect(warn).toMatch(/pool/i)
+        expect(warn).toMatch(/active/i)
+        expect(warn).toMatch(/blocked/i)
+        expect(warn).toMatch(/cooling/i)
+        // And the client body still does not.
+        expect(body).not.toMatch(POOL_BREAKDOWN_LEAK)
+        expect(body).not.toMatch(N_OF_M_LEAK)
+    })
+
+    it('FIX B: the "returned 429" claim counts ACTUAL 429s, not every probed key', async () => {
+        // Mix of statuses across the 3 attempts: 401 (blocked) → 500 (5xx) → 429.
+        // Only ONE attempt actually returned 429, so the client claim must say 1,
+        // never 3. The old body asserted "tried 3 … each returned 429" — a lie.
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(new Response('forbidden', { status: 401 }))
+            .mockResolvedValueOnce(new Response('boom', { status: 500 }))
+            .mockResolvedValueOnce(perMinute429())
+        vi.stubGlobal('fetch', fetchMock)
+        const res = await handle(proxyReq(), makeEnv(), makeCtx())
+        expect(res.status).toBe(429) // sawRateLimit → 429 path
+        const body = await res.text()
+
+        // Honest 429-count: exactly 1 key returned 429 this run.
+        expect(body).toMatch(/1 returned 429/i)
+        // It must NOT claim all three returned 429 ("each returned 429").
+        expect(body).not.toMatch(/each returned 429/i)
+        expect(body).not.toMatch(/3 returned 429/i)
+        // And still no pool-composition leak.
+        expect(body).not.toMatch(POOL_BREAKDOWN_LEAK)
+        expect(body).not.toMatch(N_OF_M_LEAK)
+    })
+
+    it('per-day/RPD cause: classifies the cause as per-day RPD exhaustion (rotation can help)', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => perDay429())
+        )
+        const res = await handle(proxyReq(), makeEnv(), makeCtx())
+        expect(res.status).toBe(429)
+        const body = await res.text()
+        expect(body).toMatch(/per-day|RPD/i)
+        // it must NOT misclassify a per-day exhaustion as a per-minute TPM cause.
+        expect(body).not.toMatch(/per-minute request|oversized per-minute/i)
+        // still no pool-composition leak.
+        expect(body).not.toMatch(POOL_BREAKDOWN_LEAK)
+        expect(body).not.toMatch(N_OF_M_LEAK)
+    })
+})
+
+describe('honest 502 body when no rate-limit signal (5xx and/or blocked keys)', () => {
+    const proxyReq = () =>
+        new Request('https://ob/api/compat/v1/chat/completions', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${AUTH_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: 'google-ai-studio/gemini-2.5-flash', messages: [] })
+        })
+
+    it('drops the old lying literal "Upstream unavailable after retries"', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => new Response('gateway boom', { status: 502 }))
+        )
+        const res = await handle(proxyReq(), makeEnv(), makeCtx())
+        expect(res.status).toBe(502)
+        const body = await res.text()
+        expect(body).not.toContain('Upstream unavailable after retries')
+    })
+
+    it('all-5xx run: claims "all returned 5xx" (blockedThisRun===0), reports the hint, no pool leak', async () => {
+        const fetchMock = vi.fn(async () => new Response('gateway boom', { status: 502 }))
+        vi.stubGlobal('fetch', fetchMock)
+        const res = await handle(proxyReq(), makeEnv(), makeCtx())
+
+        expect(res.status).toBe(502)
+        expect(fetchMock).toHaveBeenCalledTimes(3) // MAX_RETRIES = 3
+        const body = await res.text()
+
+        // explicit: there was NO rate-limit signal (distinguishes it from the 429 path).
+        expect(body).toMatch(/no rate-limit signal/i)
+        // With zero blocked keys, the strong "all returned 5xx" claim is TRUE.
+        expect(body).toMatch(/all returned 5xx/i)
+        // last upstream status captured (the most recent 5xx).
+        expect(body).toMatch(/5xx|502/i)
+        // oversize/TPM hint reused from the classification.
+        expect(body).toMatch(/too large|TPM|larger-context/i)
+        // FIX A: no pool composition in the client body.
+        expect(body).not.toMatch(POOL_BREAKDOWN_LEAK)
+        expect(body).not.toMatch(N_OF_M_LEAK)
+    })
+
+    it('FIX B: mixed blocked+5xx run does NOT claim "all returned 5xx" (softened)', async () => {
+        // 401 (blocked) → 500 → 503: blockedThisRun=1, so the unconditional
+        // "all returned 5xx" would be a soft-lie. The body must soften instead.
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(new Response('forbidden', { status: 401 }))
+            .mockResolvedValueOnce(new Response('a', { status: 500 }))
+            .mockResolvedValueOnce(new Response('b', { status: 503 }))
+        vi.stubGlobal('fetch', fetchMock)
+        const res = await handle(proxyReq(), makeEnv(), makeCtx())
+        expect(res.status).toBe(502)
+        const body = await res.text()
+
+        // The strong, now-false claim must be absent.
+        expect(body).not.toMatch(/all returned 5xx/i)
+        // It still names the last status and the no-rate-limit-signal condition.
+        expect(body).toMatch(/no rate-limit signal/i)
+        expect(body).toContain('503') // last upstream status seen
+        // Softened wording acknowledges rejected keys and/or 5xx.
+        expect(body).toMatch(/rejected keys|and\/or/i)
+        // Hint preserved; no pool leak.
+        expect(body).toMatch(/too large|TPM|larger-context/i)
+        expect(body).not.toMatch(POOL_BREAKDOWN_LEAK)
+        expect(body).not.toMatch(N_OF_M_LEAK)
+    })
+
+    it('FIX A: operator log carries the raw pool composition for the 502 path too', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => new Response('gateway boom', { status: 502 }))
+        )
+        let body = ''
+        const warn = await captureWarn(async () => {
+            const res = await handle(proxyReq(), makeEnv(), makeCtx())
+            body = await res.text()
+        })
+        expect(warn).toMatch(/pool/i)
+        expect(warn).toMatch(/active/i)
+        expect(warn).toMatch(/blocked/i)
+        expect(warn).toMatch(/cooling/i)
+        expect(body).not.toMatch(POOL_BREAKDOWN_LEAK)
+        expect(body).not.toMatch(N_OF_M_LEAK)
+    })
+
+    it('captures the LAST 5xx status when statuses differ across attempts (500 → 503 → 504)', async () => {
+        const fetchMock = vi
+            .fn()
+            .mockResolvedValueOnce(new Response('a', { status: 500 }))
+            .mockResolvedValueOnce(new Response('b', { status: 503 }))
+            .mockResolvedValueOnce(new Response('c', { status: 504 }))
+        vi.stubGlobal('fetch', fetchMock)
+        const res = await handle(proxyReq(), makeEnv(), makeCtx())
+        expect(res.status).toBe(502)
+        const body = await res.text()
+        // The LAST status (504) is the one reported, not the first.
+        expect(body).toContain('504')
+        expect(body).not.toContain('500')
     })
 })
 

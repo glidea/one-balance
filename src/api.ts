@@ -225,7 +225,18 @@ function extractModelFromPath(restResource: string): string | null {
 
 // ─── Upstream forwarding helpers (timeout + response hygiene) ───────────────
 
-const DEFAULT_UPSTREAM_TIMEOUT_MS = 60_000
+// Bifrost (the caller) times the request out at 60s. If one-balance ALSO timed
+// out at 60s the two timers raced: a slow-but-recovering upstream could surface
+// as a one-balance 504 instead of letting Bifrost own the timeout, producing the
+// inverted/confusing failure where the inner proxy reports the outage the outer
+// gateway should. Sit just ABOVE Bifrost's 60s so Bifrost's timer always wins;
+// one-balance's 504 then means "definitely longer than the caller will ever
+// wait", never a coin-flip with the caller. Override via UPSTREAM_TIMEOUT_MS.
+export const DEFAULT_UPSTREAM_TIMEOUT_MS = 65_000
+// Bifrost's own request timeout. one-balance MUST outlast it so the caller's
+// timer owns timeouts and the two never race. Kept here so the invariant is
+// testable (DEFAULT_UPSTREAM_TIMEOUT_MS > BIFROST_TIMEOUT_MS).
+export const BIFROST_TIMEOUT_MS = 60_000
 // On an upstream timeout we return 504 with a short Retry-After: the condition is
 // transient (a hung gateway/provider, not a quota window), so the caller (Bifrost)
 // should be free to fail over / retry quickly rather than wait.
@@ -373,12 +384,22 @@ async function forward(
     // touched — catastrophic for a request larger than any single free project's
     // per-minute TPM, which 429s on every key and can never succeed by rotation.
     const MAX_RETRIES = 3
+    // M: size of the ACTIVE pool we started this request with. key.ts:30 filters
+    // to status='active', so blocked keys (e.g. the ~144 invalid ones) are already
+    // excluded — "all attempted" only ever means the few active keys we probed.
+    const activePoolSize = activeKeys.length
+    let attempted = 0 // N: how many keys we actually probed this request (≤ MAX_RETRIES)
     let lastRateLimitSec = 0 // Retry-After hint (seconds) from the most recent 429
     let sawRateLimit = false
+    let lastRate429Cause: Rate429Cause = 'unknown' // why the most recent 429 fired
+    let cooledThisRun = 0 // keys we cooled (429) during this request
+    let blockedThisRun = 0 // keys we blocked (401/403/invalid-400) during this request
+    let lastServerErrorStatus = 0 // most recent upstream 5xx status (for the honest 502 body)
     for (let i = 0; i < MAX_RETRIES; i++) {
         if (activeKeys.length === 0) {
             break
         }
+        attempted++
 
         const selectedKey = await selectKey(activeKeys, model, fingerprint)
         const reqToGateway = await makeGatewayRequest(
@@ -415,6 +436,7 @@ async function forward(
             case 403:
                 ctx.waitUntil(keyService.setKeyStatus(env, provider, selectedKey.id, 'blocked'))
                 console.error(`key ${selectedKey.id} is blocked due to ${respFromGateway.status}`)
+                blockedThisRun++
                 if (activeKeys.length < 500) {
                     // save the CPU time for Cloudflare Free plan
                     activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
@@ -424,12 +446,14 @@ async function forward(
             // rate limited: cool the key for the right amount (RPD → midnight PT,
             // per-minute → the provider's RetryInfo delay) and try another key
             case 429: {
-                const sec = await cooldownSecondsFor429(respFromGateway, provider)
+                const { seconds: sec, cause } = await classifyRate429(respFromGateway, provider)
                 ctx.waitUntil(keyService.setKeyModelCooldownIfAvailable(env, selectedKey.id, provider, model, sec))
                 sawRateLimit = true
                 lastRateLimitSec = sec
+                lastRate429Cause = cause
+                cooledThisRun++
                 console.warn(
-                    `key ${selectedKey.id} cooling ${sec}s for model ${model} (429, attempt ${i + 1}/${MAX_RETRIES})`
+                    `key ${selectedKey.id} cooling ${sec}s for model ${model} (429 ${cause}, attempt ${i + 1}/${MAX_RETRIES})`
                 )
                 if (activeKeys.length < 500) {
                     activeKeys.splice(activeKeys.indexOf(selectedKey), 1)
@@ -442,24 +466,111 @@ async function forward(
             case 503:
             case 504:
                 console.error(`gateway returned 5xx ${respFromGateway.status}`)
+                lastServerErrorStatus = respFromGateway.status
                 continue // no backoff, just retry...
         }
 
         return proxyResponse(respFromGateway)
     }
 
-    // Retries exhausted. If the failures were rate limits, surface a real 429
-    // with a Retry-After hint so the caller backs off — not a generic 500, which
-    // made a transiently-throttled pool look like a hard outage and hid the
-    // rate-limit signal from the client.
+    // Retries exhausted. Surface an HONEST body that names the real CAUSE and the
+    // ACTION — but NOTHING about backend capacity/health. ai-node proxies this
+    // body VERBATIM to the (possibly shared/sold) virtual-key holder, so the exact
+    // active-pool size and the blocked/cooling breakdown are an info-disclosure
+    // leak across the trust boundary (STRIDE). The pool composition is logged
+    // server-side for operators instead — see logExhaustedPool below.
+    logExhaustedPool({
+        kind: sawRateLimit ? '429' : '502',
+        activePoolSize,
+        attempted,
+        cooledThisRun,
+        blockedThisRun,
+        lastServerErrorStatus,
+        cause: lastRate429Cause,
+        model
+    })
+
     if (sawRateLimit) {
         const headers: Record<string, string> = { 'Content-Type': 'text/plain' }
         if (lastRateLimitSec > 0) {
             headers['Retry-After'] = String(lastRateLimitSec)
         }
-        return new Response('Rate limited: all attempted keys are cooling down', { status: 429, headers })
+        const retryAfterNote = lastRateLimitSec > 0 ? ` Retry-After: ${lastRateLimitSec}s.` : ''
+        // FIX B: "returned 429" counts the ACTUAL 429s (cooledThisRun), not every
+        // probed key — `attempted` also counts 401/403-blocked and 5xx keys, so
+        // the old "each returned 429" claim lied whenever the run was mixed.
+        const body =
+            `Rate limited: the fingerprint-pinned key and its rotation fallbacks were exhausted ` +
+            `(${cooledThisRun} returned 429). ` +
+            `Cause: ${describeRate429Cause(lastRate429Cause)}. ` +
+            `${rotationAdvice(lastRate429Cause)}` +
+            retryAfterNote
+        return new Response(body, { status: 429, headers })
     }
-    return new Response('Upstream unavailable after retries', { status: 502 })
+    // No rate-limit signal at all. Capture the LAST upstream status (most recent
+    // evidence) and explain that a free-tier per-minute/TPM overflow is the
+    // likeliest real cause. FIX B: only claim "all returned 5xx" when NO key was
+    // blocked this run; a mixed run (some keys 401/403-rejected, or early
+    // pool-exhaustion) softens to a claim that does not overstate the 5xx.
+    const lastStatusText = lastServerErrorStatus > 0 ? String(lastServerErrorStatus) : '5xx'
+    const upstreamClaim =
+        blockedThisRun === 0
+            ? `all returned 5xx (last status ${lastStatusText})`
+            : `last upstream status ${lastStatusText}; the pool returned 5xx and/or rejected keys with no rate-limit signal`
+    return new Response(
+        `Upstream rejected request after ${attempted} key attempts (no rate-limit signal): ` +
+            `${upstreamClaim} — likely request too large for free-tier ` +
+            `per-minute TPM or a transient gateway error. Compact the request or use a larger-context model.`,
+        { status: 502, headers: { 'Content-Type': 'text/plain' } }
+    )
+}
+
+// Operator-only record of the exhausted-pool composition. This is the capacity/
+// health detail deliberately WITHHELD from the client body (it crosses the
+// virtual-key trust boundary): operators get the full picture in the logs, the
+// client gets only the cause and the action. Kept as a single structured warn so
+// it is greppable and never drifts from the two exhaustion sites that call it.
+function logExhaustedPool(info: {
+    kind: '429' | '502'
+    activePoolSize: number
+    attempted: number
+    cooledThisRun: number
+    blockedThisRun: number
+    lastServerErrorStatus: number
+    cause: Rate429Cause
+    model: string
+}): void {
+    console.warn(
+        `exhausted-pool ${info.kind} model=${info.model} cause=${info.cause} ` +
+            `(Pool: ${info.activePoolSize} active, ${info.blockedThisRun} blocked, ${info.cooledThisRun} cooling; ` +
+            `attempted=${info.attempted}, lastServerErrorStatus=${info.lastServerErrorStatus || 'none'})`
+    )
+}
+
+// Human-readable cause for the honest 429 body — mirrors the classification the
+// cooldown duration was derived from (RPD vs per-minute/TPM).
+function describeRate429Cause(cause: Rate429Cause): string {
+    switch (cause) {
+        case 'per-day-rpd':
+            return 'per-day RPD quota exhausted for the probed projects'
+        case 'per-minute-tpm':
+            return 'per-minute TPM — request too large for free-tier per-minute quota'
+        default:
+            return 'rate limited (cause unclassified from the 429 body)'
+    }
+}
+
+// Whether rotating across more keys can help — it cannot beat an oversized
+// per-minute request (every project shares the same free-tier per-minute TPM),
+// but a per-day exhaustion may clear on a project that still has daily budget.
+function rotationAdvice(cause: Rate429Cause): string {
+    if (cause === 'per-minute-tpm') {
+        return 'Rotation across more keys will NOT help an oversized per-minute request — compact the request or raise the per-minute quota.'
+    }
+    if (cause === 'per-day-rpd') {
+        return 'These projects are out of per-day budget; rotation may help only if other projects still have daily quota — otherwise wait for the midnight PT reset.'
+    }
+    return 'If this persists, compact the request or raise the per-minute quota.'
 }
 
 function getAuthKey(request: Request, provider: string): string {
@@ -712,6 +823,27 @@ async function keyIsInvalid(respFromGateway: Response, provider: string): Promis
     }
 }
 
+// Why a 429 happened — the dimension that decides whether ROTATING to another
+// key can possibly help:
+//   • 'per-day-rpd'    — this project's per-day request quota is spent; a DIFFERENT
+//                        project (key) still has budget, so rotation genuinely helps.
+//   • 'per-minute-tpm' — a per-minute / input-tokens-per-minute limit. A request
+//                        larger than any single free project's per-minute TPM 429s
+//                        on EVERY key — rotation can NEVER save it; the request must
+//                        be compacted or the quota raised.
+//   • 'unknown'        — no QuotaFailure/RetryInfo we could classify.
+// This is the SAME signal the cooldown duration is derived from (RPD → bench until
+// midnight; per-minute → short cooldown), surfaced so the exhausted-pool message
+// can state the TRUE cause instead of the old "all keys cooling down" lie.
+export type Rate429Cause = 'per-day-rpd' | 'per-minute-tpm' | 'unknown'
+
+// A classified 429: how long to cool the key AND why it was throttled. Both come
+// from one parse of the body so the cooldown and the user-facing cause never drift.
+export interface Rate429 {
+    seconds: number
+    cause: Rate429Cause
+}
+
 // cooldownSecondsFor429 derives how long to cool a key from the ACTUAL quota
 // signal in the 429 body, not a consecutive-count heuristic. The old code
 // benched a key until midnight PT (≤24h) after N consecutive 429s — which
@@ -721,17 +853,24 @@ async function keyIsInvalid(respFromGateway: Response, provider: string): Promis
 // per-minute limit yields a short cooldown (rotation does NOT help an oversized
 // request, so we cool briefly and let the bounded retry loop give up fast).
 export async function cooldownSecondsFor429(respFromGateway: Response, provider: string): Promise<number> {
+    return (await classifyRate429(respFromGateway, provider)).seconds
+}
+
+// classifyRate429 returns both the cooldown duration and the cause in one pass.
+// cooldownSecondsFor429 is the thin "seconds only" wrapper kept for the callers
+// (and tests) that only need the duration.
+export async function classifyRate429(respFromGateway: Response, provider: string): Promise<Rate429> {
     if (provider === 'google-ai-studio') {
         return untilResetForGoogleAiStudio(respFromGateway)
     }
     if (provider === 'openrouter') {
-        return untilResetForOpenrouter(respFromGateway)
+        return { seconds: await untilResetForOpenrouter(respFromGateway), cause: 'unknown' }
     }
 
-    return 65
+    return { seconds: 65, cause: 'unknown' }
 }
 
-async function untilResetForGoogleAiStudio(respFromGateway: Response): Promise<number> {
+async function untilResetForGoogleAiStudio(respFromGateway: Response): Promise<Rate429> {
     try {
         const errorBody = await respFromGateway.clone().json()
         const quotaFailureDetail = getGoogleAiStudioErrorDetail(
@@ -745,7 +884,7 @@ async function untilResetForGoogleAiStudio(respFromGateway: Response): Promise<n
                     // Requests-per-day (RPD) quota — this project is done for the
                     // day; reset is at midnight Pacific. Rotating keys helps here.
                     console.warn('429 reason=RPD (per-day per-project) → cool until midnight PT')
-                    return util.getSecondsUntilMidnightPT()
+                    return { seconds: util.getSecondsUntilMidnightPT(), cause: 'per-day-rpd' }
                 }
             }
             // QuotaFailure present but not RPD → a per-minute/per-request quota
@@ -764,16 +903,24 @@ async function untilResetForGoogleAiStudio(respFromGateway: Response): Promise<n
             // used for an unclassified 429 instead of benching the key for NaN.
             if (Number.isFinite(retrySeconds)) {
                 console.warn(`429 reason=RetryInfo retryDelay=${retrySeconds}s`)
-                return retrySeconds + 2 // 2 seconds buffer
+                // A bare RetryInfo (no RPD QuotaFailure) is the per-minute backoff
+                // signal — rotation cannot beat an oversized per-minute request.
+                return { seconds: retrySeconds + 2, cause: 'per-minute-tpm' } // 2 seconds buffer
             }
             console.warn(`429 reason=RetryInfo unparseable retryDelay='${retryInfoDetail.retryDelay}' → fallback 65s`)
-            return 65
+            // QuotaFailure(non-RPD) reached here only via a per-minute quota; an
+            // unparseable delay still leaves the cause per-minute. With neither
+            // signal present the cause is genuinely unknown.
+            return { seconds: 65, cause: quotaFailureDetail ? 'per-minute-tpm' : 'unknown' }
         }
         console.warn('429 reason=unclassified (no QuotaFailure/RetryInfo) → fallback 65s')
+        // A non-RPD QuotaFailure with no RetryInfo is still a per-minute/per-request
+        // limit; truly nothing parseable → unknown.
+        return { seconds: 65, cause: quotaFailureDetail ? 'per-minute-tpm' : 'unknown' }
     } catch (error) {
         console.error('failed to parse google-ai-studio 429 response, fallback to 65 seconds', error)
     }
-    return 65
+    return { seconds: 65, cause: 'unknown' }
 }
 
 async function untilResetForOpenrouter(respFromGateway: Response): Promise<number> {
