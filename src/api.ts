@@ -107,7 +107,7 @@ async function handleKeysNext(request: Request, env: Env): Promise<Response> {
     }
 
     const fingerprint = readConversationFingerprint(request)
-    const selectedKey = await selectKey(activeKeys, model, fingerprint)
+    const selectedKey = await selectKey(activeKeys, model, fingerprint, keySelectionStrategy(env))
     const cooling = selectedKey.modelCoolings?.[model]
     const coolingUntil = cooling && cooling.end_at > Date.now() / 1000 ? cooling.end_at : null
 
@@ -401,7 +401,7 @@ async function forward(
         }
         attempted++
 
-        const selectedKey = await selectKey(activeKeys, model, fingerprint)
+        const selectedKey = await selectKey(activeKeys, model, fingerprint, keySelectionStrategy(env))
         const reqToGateway = await makeGatewayRequest(
             request.method,
             request.headers,
@@ -648,6 +648,85 @@ function getDeterministicIndex(fingerprint: string, length: number): number {
     return num % length
 }
 
+// ─── Rendezvous / Highest-Random-Weight (HRW) selection ─────────────────────
+// The legacy sticky path is `hash(fingerprint) % len(activeKeys)` (modulo). It
+// is CHURN-UNSTABLE: when the active-key set changes size (a key blocked/cooled/
+// added) the index `% len` moves, so a live conversation remaps to a DIFFERENT
+// key and loses Google's key/project-scoped implicit cache exactly when the pool
+// churns. HRW fixes this: each key gets an independent score derived from the
+// fingerprint AND the key's STABLE id, and the highest score wins. Removing a
+// non-winning key cannot change which key has the max score, so the winner is
+// invariant under churn; adding a key reassigns only ~1/(n+1) of conversations
+// (and only ever ONTO the new key). Opt-in behind KEY_SELECTION_STRATEGY='hrw'.
+
+// 64-bit string hash for HRW scoring: FNV-1a accumulation followed by the
+// MurmurHash3 fmix64 finalizer. BigInt math keeps all 64 bits exact (a JS
+// `number` holds only 53 bits — truncating would cluster scores and defeat the
+// uniform spread HRW relies on). The fmix64 step is REQUIRED, not decorative:
+// raw FNV-1a avalanches poorly across near-identical inputs (the keys differ
+// only in the trailing id), which skews the winner distribution badly (measured
+// chi-square ~470 over 5 keys); fmix64 restores uniformity (chi-square ~4.5).
+// Pure and dependency-free — standard rendezvous-hashing practice.
+const FNV64_OFFSET = 0xcbf29ce484222325n
+const FNV64_PRIME = 0x100000001b3n
+const U64_MASK = 0xffffffffffffffffn
+
+function fmix64(h: bigint): bigint {
+    h ^= h >> 33n
+    h = (h * 0xff51afd7ed558ccdn) & U64_MASK
+    h ^= h >> 33n
+    h = (h * 0xc4ceb9fe1a85ec53n) & U64_MASK
+    h ^= h >> 33n
+    return h
+}
+
+function hash64(input: string): bigint {
+    let h = FNV64_OFFSET
+    for (let i = 0; i < input.length; i++) {
+        h ^= BigInt(input.charCodeAt(i))
+        h = (h * FNV64_PRIME) & U64_MASK
+    }
+    return fmix64(h)
+}
+
+// Pure HRW selection: for each key, score = hash64(`${fingerprint}:${key.id}`);
+// return the key with the maximum score. Ties (astronomically unlikely with a
+// 64-bit hash, but defended) break deterministically by the lexicographically
+// smallest key.id, so the result is a pure function of (fingerprint, key set) —
+// independent of array order and free of any Math.random. `keys` must be
+// non-empty (callers guarantee an empty pool 503s long before selection).
+export function selectByHRW(keys: schema.Key[], fingerprint: string): schema.Key {
+    let best = keys[0]
+    let bestScore = hash64(`${fingerprint}:${best.id}`)
+    for (let i = 1; i < keys.length; i++) {
+        const k = keys[i]
+        const score = hash64(`${fingerprint}:${k.id}`)
+        if (score > bestScore || (score === bestScore && k.id < best.id)) {
+            best = k
+            bestScore = score
+        }
+    }
+    return best
+}
+
+// Cooldown-aware HRW pick, analogous to tryHashedSelect: rank only the keys that
+// are AVAILABLE (not cooling for this model) and return the HRW winner among
+// them. Returns null when every key is cooling, so selectKey falls through to
+// selectFromAllKeys (unchanged) exactly as the hashed path does.
+function tryHrwSelect(keys: schema.Key[], model: string, fingerprint: string): schema.Key | null {
+    const now = Date.now() / 1000
+    const available = keys.filter(k => {
+        const coolingEnd = k.modelCoolings?.[model]?.end_at
+        return !coolingEnd || coolingEnd < now
+    })
+    if (available.length === 0) {
+        return null
+    }
+    const selected = selectByHRW(available, fingerprint)
+    console.info(`selected HRW key ${selected.id} for fingerprint ${safeFingerprint(fingerprint)}`)
+    return selected
+}
+
 function tryHashedSelect(keys: schema.Key[], model: string, fingerprint: string): schema.Key | null {
     const now = Date.now() / 1000
     const keyIndex = getDeterministicIndex(fingerprint, keys.length)
@@ -669,14 +748,35 @@ function tryHashedSelect(keys: schema.Key[], model: string, fingerprint: string)
     return null
 }
 
-async function selectKey(keys: schema.Key[], model: string, fingerprint?: string): Promise<schema.Key> {
+// Selection strategy for a fingerprinted (sticky) request:
+//   'hash' (DEFAULT)  — legacy `hash(fingerprint) % len` consistent hashing.
+//   'hrw'             — rendezvous/highest-random-weight (churn-stable).
+// Sourced from env.KEY_SELECTION_STRATEGY; ANY unrecognized/absent value is
+// fail-safe-coerced to 'hash', so the flag is strictly opt-in and the default
+// behavior is byte-identical to the current one.
+type KeySelectionStrategy = 'hash' | 'hrw'
+
+function keySelectionStrategy(env: Env): KeySelectionStrategy {
+    return env.KEY_SELECTION_STRATEGY === 'hrw' ? 'hrw' : 'hash'
+}
+
+async function selectKey(
+    keys: schema.Key[],
+    model: string,
+    fingerprint?: string,
+    strategy: KeySelectionStrategy = 'hash'
+): Promise<schema.Key> {
     // Only an empty-or-non-hex fingerprint degrades to random; a usable one pins
-    // a key by consistent hash so a conversation sticks to the same key (sharing
-    // its rate-limit budget) instead of fanning out across the pool.
+    // a key (by consistent hash, or by HRW when opted in) so a conversation
+    // sticks to the same key (sharing its rate-limit budget and Google's
+    // implicit cache) instead of fanning out across the pool.
     const hashable = isUsableFingerprint(fingerprint) ? fingerprint : undefined
 
     if (hashable) {
-        let selectedKey = tryHashedSelect(keys, model, hashable)
+        // HRW is opt-in AND only ever taken WITH a usable fingerprint. The 'hash'
+        // default and the no-fingerprint path are untouched (byte-identical).
+        const selectedKey =
+            strategy === 'hrw' ? tryHrwSelect(keys, model, hashable) : tryHashedSelect(keys, model, hashable)
         if (selectedKey) {
             return selectedKey
         }
