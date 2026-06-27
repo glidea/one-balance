@@ -8,6 +8,41 @@ type AuthKey = {
     expiresAt?: number // unix timestamp in seconds
 }
 
+// Constant-time string equality for SECRETS (auth keys, bearer tokens).
+//
+// A plain `a === b` returns as soon as the first differing byte is found, so the
+// time it takes to reject a guess leaks how long a correct *prefix* the attacker
+// supplied — a classic timing side-channel that lets a secret be recovered byte
+// by byte. This helper removes that signal:
+//   • It always walks the FULL length of the longer input (no early exit), so the
+//     work done is independent of where — or whether — the strings first differ.
+//   • It folds a length mismatch into the same accumulator (seeded with the length
+//     delta and indexing the shorter string modulo its own length), so unequal
+//     lengths are rejected without a separate, faster `a.length !== b.length`
+//     branch that would itself leak length.
+// We compare UTF-16 code units (charCodeAt); auth keys/tokens here are ASCII, so
+// code units and bytes coincide. This is data-independent in branch shape; it is
+// not a hardware-constant-time primitive, but it closes the practical
+// equality-timing oracle on the auth path. (Workers has no node:crypto
+// timingSafeEqual at module top-level, hence this dependency-free helper.)
+export function timingSafeEqual(a: string, b: string): boolean {
+    const aLen = a.length
+    const bLen = b.length
+    // Seed with the length difference so a length mismatch can never produce 0.
+    let diff = aLen ^ bLen
+    const max = aLen > bLen ? aLen : bLen
+    for (let i = 0; i < max; i++) {
+        // Index each string modulo its own length so we never read past the end
+        // (charCodeAt out-of-range returns NaN, which would poison the XOR). When
+        // lengths differ, `diff` is already non-zero, so the masked compare's exact
+        // value is irrelevant to correctness — only the constant work matters.
+        const ca = a.charCodeAt(i % (aLen || 1))
+        const cb = b.charCodeAt(i % (bLen || 1))
+        diff |= ca ^ cb
+    }
+    return diff === 0
+}
+
 const parseCache = new Map<string, AuthKey[]>()
 
 function parseAuthKeys(authKeysStr: string): AuthKey[] {
@@ -68,7 +103,8 @@ function parseAuthKeys(authKeysStr: string): AuthKey[] {
 function findAuthKey(toCheck: string, parsedKeys: AuthKey[]): AuthKey | undefined {
     const now = Date.now() / 1000
     for (const authKey of parsedKeys) {
-        if (authKey.key === toCheck) {
+        // Constant-time compare: secret equality must not leak via timing.
+        if (timingSafeEqual(authKey.key, toCheck)) {
             if (authKey.expiresAt && authKey.expiresAt < now) {
                 return undefined // expired
             }

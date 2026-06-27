@@ -1,0 +1,24 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "one-balance",
+    "main": "src/index.ts",
+    "compatibility_date": "2025-06-20",
+    "ai": {
+        "binding": "AI"
+    },
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "one-balance",
+            "database_id": "267c08aa-e821-4abd-b6a7-7afd40add478",
+            "migrations_dir": "src/service/d1/migrations"
+        }
+    ],
+    "vars": {
+        "AI_GATEWAY": "one-balance",
+        "UPSTREAM_TIMEOUT_MS": "60000"
+    },
+    "observability": {
+        "enabled": true
+    }
+}

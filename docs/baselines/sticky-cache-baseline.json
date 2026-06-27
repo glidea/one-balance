@@ -1,0 +1,24 @@
+{
+  "gateway": "one-balance",
+  "source_sha": "8447fb568e2633e0e5944d9ed6d0b7e7773f1b8d",
+  "measured_at": "2026-06-27T00:00:00.000Z",
+  "floor": true,
+  "measured": false,
+  "cached_hit_fraction": null,
+  "under_budget_spill_count": {
+    "unavailable": true,
+    "reason": "CF_ACCOUNT_ID or CF_API_TOKEN not set; measurement not possible"
+  },
+  "status_shares": {
+    "s429": null,
+    "s503": null,
+    "success": null
+  },
+  "per_metric": {
+    "cached_hit_fraction": "NOT_MEASURED — CF credentials absent; run with CF_ACCOUNT_ID+CF_API_TOKEN",
+    "under_budget_spill_count": "NOT_AVAILABLE — count(requests where cost_tokens < budget_tokens) not exposed by CF Analytics",
+    "status_shares": "NOT_MEASURED — CF credentials absent; run with CF_ACCOUNT_ID+CF_API_TOKEN"
+  },
+  "provenance": null,
+  "notes": "NOT-MEASURED sentinel. Re-run with CF_ACCOUNT_ID+CF_API_TOKEN set to produce a real baseline. Do not commit this artifact — the guard test will fail on floor:true."
+}

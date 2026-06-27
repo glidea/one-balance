@@ -56,20 +56,26 @@ async function main() {
 
     const authKey = process.env.AUTH_KEY
     if (authKey) {
-        console.log(`Setting AUTH_KEY to '${authKey}'...`)
+        console.log('Setting AUTH_KEY (value hidden)...')
         config.vars.AUTH_KEY = authKey
     }
 
-    const consecutive429Threshold = process.env.CONSECUTIVE_429_THRESHOLD
-    if (consecutive429Threshold) {
-        console.log(`Setting CONSECUTIVE_429_THRESHOLD to '${consecutive429Threshold}'...`)
-        config.vars.CONSECUTIVE_429_THRESHOLD = consecutive429Threshold
+    const keyManagerToken = process.env.KEY_MANAGER_TOKEN
+    if (keyManagerToken) {
+        console.log('Setting KEY_MANAGER_TOKEN (value hidden)...')
+        config.vars.KEY_MANAGER_TOKEN = keyManagerToken
     }
 
     const aiGateway = process.env.AI_GATEWAY
     if (aiGateway) {
         console.log(`Setting AI_GATEWAY to '${aiGateway}'...`)
         config.vars.AI_GATEWAY = aiGateway
+    }
+
+    const upstreamTimeoutMs = process.env.UPSTREAM_TIMEOUT_MS
+    if (upstreamTimeoutMs) {
+        console.log(`Setting UPSTREAM_TIMEOUT_MS to '${upstreamTimeoutMs}'...`)
+        config.vars.UPSTREAM_TIMEOUT_MS = upstreamTimeoutMs
     }
 
     // TODO: auto create ai gateway when wrangler supports it

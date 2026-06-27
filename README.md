@@ -45,6 +45,26 @@
 - **免费且简单**: 基于 Cloudflare Workers，一键部署，并可充分利用其免费额度（包括大规模 Key 下的 CPU Time 优化，榨干 Clouflare Free Plan）。
 - **广泛的兼容性**: 支持 Cloudflare AI Gateway 兼容的所有 API 提供商。包括支持轮询 Gemini TTS，应该是全网独一家（已用到 https://zenfeed.xyz 实时生成新闻播客）
 
+## Labpics fork — aiproxy consolidation
+
+This fork absorbs the live `aiproxy` worker into one-balance so `aiproxy` can be retired and Bifrost can call one-balance directly. All additions are on the **Gemini-native** path (`/api/{provider}/...`) — the path Bifrost uses (`google-ai-studio`, native Gemini protocol, `x-goog-api-key` auth).
+
+- **ListModels** — `GET /api/google-ai-studio/v1beta/models` (also `/v1/models`, `/models`) now works. It is forwarded to AI Gateway with any active pooled key (not model-specific, so no per-model cooldown applies) and the upstream body is returned as-is. GET is idempotent, so a transient upstream `5xx` is retried once.
+- **`/health`** — `GET /health` → `200 ok`. A liveness probe for the Bifrost → one-balance → AI Gateway → Google chain.
+- **Upstream timeout** — every forward to AI Gateway (the proxy path and ListModels) is bounded by an `AbortController` set to `UPSTREAM_TIMEOUT_MS` (default **60000** ms). The timer covers only the receipt of response _headers_; once they arrive it is cleared, so streaming the body is never interrupted. On timeout one-balance returns `504` with a `Retry-After` header.
+    - **Keep `UPSTREAM_TIMEOUT_MS` below Bifrost's request timeout (300s).** Bifrost only fails over to its next provider after one-balance responds; if one-balance can hang longer than Bifrost waits, Bifrost times out first and its fallbacks never fire. The 60s default leaves ample headroom — and a timeout ends the request immediately (it is not retried), so worst-case wall-clock is about one `UPSTREAM_TIMEOUT_MS`.
+- **`content-disposition` stripped** — removed from proxied responses so a JSON/SSE body is never treated as a file download.
+
+`UPSTREAM_TIMEOUT_MS` lives in `wrangler.jsonc.tpl` `vars` and can be overridden at deploy via the `UPSTREAM_TIMEOUT_MS` env var (same pattern as `AUTH_KEY` / `KEY_MANAGER_TOKEN`).
+
+### Smoke test (opt-in, against a deployed worker)
+
+```bash
+ONE_BALANCE_URL=https://<your-worker-url> GEMINI_PROXY_KEY=<service-auth-key> pnpm smoke
+```
+
+Checks `/health`, ListModels, and a cheap `generateContent` (`maxOutputTokens: 8`). Not wired into CI — it hits a live worker and consumes a real pooled key.
+
 ## 部署指南
 
 #### 0. 准备环境

@@ -28,7 +28,7 @@ export async function listActiveKeysViaCache(env: Env, provider: string): Promis
             modelCoolings: true
         },
         where: drizzle.and(drizzle.eq(schema.keys.status, 'active'), drizzle.eq(schema.keys.provider, provider)),
-        orderBy: drizzle.sql`RANDOM()`,
+        orderBy: drizzle.asc(schema.keys.id),
         limit: 1000
     })) as schema.Key[]
 
