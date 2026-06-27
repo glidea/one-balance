@@ -209,7 +209,11 @@ vite.config.ts.timestamp-*
 
 # Custom
 src/service/d1/migrations/
-docs/
+# docs/ is ignored wholesale EXCEPT docs/baselines/ which holds committed baseline artifacts.
+# Git rule: negation only works when the parent dir is not itself ignored.
+# So we negate docs/ first, then ignore docs/* sub-paths, then re-allow docs/baselines/.
+docs/*
+!docs/baselines/
 worker-configuration.d.ts
 
 # Local analysis clones (never commit sibling repos checked out inside this one)
