@@ -209,7 +209,8 @@ vite.config.ts.timestamp-*
 
 # Custom
 src/service/d1/migrations/
-docs/
+docs/*
+!docs/runbooks/
 worker-configuration.d.ts
 
 # Local analysis clones (never commit sibling repos checked out inside this one)
