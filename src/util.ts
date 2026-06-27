@@ -134,10 +134,6 @@ function isApiAllowed(authKey: AuthKey, provider: string, model: string): boolea
     return true
 }
 
-function isWebUiAllowed(authKey: AuthKey): boolean {
-    return authKey.unrestricted
-}
-
 export function isApiRequestAllowed(authKey: string, authKeysStr: string, provider: string, model: string): boolean {
     if (!authKey || !authKeysStr) {
         return false
@@ -163,7 +159,7 @@ export function isWebUiRequestAllowed(authKey: string, authKeysStr: string): boo
         return false
     }
 
-    return isWebUiAllowed(foundKey)
+    return foundKey.unrestricted
 }
 
 export function getSecondsUntilMidnightPT(): number {
@@ -185,10 +181,3 @@ export function getSecondsUntilMidnightPT(): number {
     return 24 * 60 * 60 - secondsPassed
 }
 
-export function getSecondsUntilMidnightUTC(): number {
-    const now = new Date()
-    const utcMidnight = new Date(now)
-    utcMidnight.setUTCDate(utcMidnight.getUTCDate() + 1)
-    utcMidnight.setUTCHours(0, 0, 0, 0)
-    return Math.floor((utcMidnight.getTime() - now.getTime()) / 1000)
-}

@@ -182,13 +182,8 @@ async function extractRealProviderAndModel(
 
     // find the real provider from model (e.g. google-ai-studio/gemini-2.0-flash)
     // see https://developers.cloudflare.com/ai-gateway/chat-completion/#curl
-    const realProvider = model.split('/')[0]
-    if (!realProvider) {
-        // bad request
-        return null
-    }
-    const realModel = model.split('/')[1]
-    if (!realModel) {
+    const [realProvider, realModel] = model.split('/')
+    if (!realProvider || !realModel) {
         // bad request
         return null
     }
@@ -587,17 +582,11 @@ function getAuthKey(request: Request, provider: string): string {
 
 function getAuthKeyFromHeader(request: Request, provider: string): string {
     const h = getAuthHeaderName(provider)
-    let v = request.headers.get(h)
+    const v = request.headers.get(h)
     if (!v) {
         return ''
     }
-
-    let key = v
-    if (h === 'Authorization') {
-        key = v.replace(/^Bearer\s+/, '')
-    }
-
-    return key
+    return h === 'Authorization' ? v.replace(/^Bearer\s+/, '') : v
 }
 
 // Bifrost forwards the conversation fingerprint under the DE-PREFIXED name
@@ -893,16 +882,10 @@ function selectGateway(env: Env): string {
     return selected
 }
 
-function setAuthHeader(headers: Headers, restResource: string, key: string) {
+function setAuthHeader(headers: Headers, restResource: string, key: string): void {
     const provider = restResource.split('/')[0]
-
-    let v = key
     const h = getAuthHeaderName(provider)
-    if (h == 'Authorization') {
-        v = `Bearer ${key}`
-    }
-
-    headers.set(h, v)
+    headers.set(h, h === 'Authorization' ? `Bearer ${key}` : key)
 }
 
 async function keyIsInvalid(respFromGateway: Response, provider: string): Promise<boolean> {

@@ -510,7 +510,7 @@ function buildStatusTabs(
             const activeClasses = isActive
                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 border border-blue-600'
                 : 'bg-white/80 text-gray-800 hover:bg-white border border-gray-300 hover:border-gray-400'
-            const link = buildPageLink(provider, s, q, 1, 20, sortBy, sortOrder)
+            const link = buildPageLink(provider, s, q, 1, sortBy, sortOrder)
             return `<a href="${link}" class="px-6 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${activeClasses}">${s.charAt(0).toUpperCase() + s.slice(1)}</a>`
         })
         .join('')
@@ -651,7 +651,7 @@ function buildPaginationButton(
             ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>'
             : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>'
 
-    const link = buildPageLink(provider, status, q, targetPage, 20, sortBy, sortOrder)
+    const link = buildPageLink(provider, status, q, targetPage, sortBy, sortOrder)
 
     const baseClasses = 'p-2 rounded-lg text-sm font-medium transition-all duration-200'
     const disabledClasses = 'bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300 pointer-events-none'
@@ -682,7 +682,7 @@ function buildPageNumberButton(
     }
 
     const isCurrent = pageItem === currentPage
-    const link = buildPageLink(provider, status, q, pageItem, 20, sortBy, sortOrder)
+    const link = buildPageLink(provider, status, q, pageItem, sortBy, sortOrder)
 
     const baseClasses = 'px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200'
     const currentClasses =
@@ -703,7 +703,6 @@ function buildPageLink(
     status: string,
     q: string,
     page: number,
-    pageSize: number,
     sortBy: string,
     sortOrder: string
 ): string {
@@ -722,25 +721,7 @@ function buildPageLink(
     return `/keys/${provider}?${params.toString()}`
 }
 
-function formatUsedTime(createdAt: Date): string {
-    const now = Date.now() / 1000
-    const usedSeconds = now - createdAt.getTime() / 1000
-    const days = Math.floor(usedSeconds / 86400)
-    const hours = Math.floor((usedSeconds % 86400) / 3600)
-    const minutes = Math.floor((usedSeconds % 3600) / 60)
-
-    if (days > 0) {
-        return `${days}d${hours}h`
-    }
-    if (hours > 0) {
-        return `${hours}h${minutes}m`
-    }
-    return `${minutes}m`
-}
-
-function formatCoolingTime(totalSeconds: number): string {
-    if (totalSeconds === 0) return '-'
-
+function formatDuration(totalSeconds: number): string {
     const days = Math.floor(totalSeconds / 86400)
     const hours = Math.floor((totalSeconds % 86400) / 3600)
     const minutes = Math.floor((totalSeconds % 3600) / 60)
@@ -752,6 +733,16 @@ function formatCoolingTime(totalSeconds: number): string {
         return `${hours}h${minutes}m`
     }
     return `${minutes}m`
+}
+
+function formatUsedTime(createdAt: Date): string {
+    const usedSeconds = Date.now() / 1000 - createdAt.getTime() / 1000
+    return formatDuration(usedSeconds)
+}
+
+function formatCoolingTime(totalSeconds: number): string {
+    if (totalSeconds === 0) return '-'
+    return formatDuration(totalSeconds)
 }
 
 function buildTableHeader(
@@ -831,7 +822,6 @@ function buildTableContent(
         currentStatus,
         q,
         1,
-        20,
         coolingSortParams.sortBy,
         coolingSortParams.sortOrder
     )
@@ -842,7 +832,6 @@ function buildTableContent(
         currentStatus,
         q,
         1,
-        20,
         usedTimeSortParams.sortBy,
         usedTimeSortParams.sortOrder
     )
@@ -959,7 +948,7 @@ function buildAddKeysForm(
                 </div>
                 <div class="flex justify-end">
                     <button type="submit" 
-                            formaction="/keys/${provider}${buildPageLink(provider, currentStatus, q, page, 20, sortBy, sortOrder)}" 
+                            formaction="/keys/${provider}${buildPageLink(provider, currentStatus, q, page, sortBy, sortOrder)}"
                             class="btn-primary px-6 py-3 text-white font-semibold rounded-xl focus:outline-none focus:ring-4 focus:ring-blue-200">
                         Add Keys
                     </button>
