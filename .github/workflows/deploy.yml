@@ -1,0 +1,56 @@
+name: Deploy (production)
+
+# The SINGLE, gated path to production. This replaces ad-hoc `wrangler deploy`
+# from a laptop or a feature branch — which is how unreviewed/dirty code reached
+# prod before (and forced manual rollbacks). Production deploys ONLY when ALL hold:
+#   Gate 1 — the CI workflow succeeded on `main`;
+#   Gate 2 — a human approves the `production` environment (required reviewer);
+#   Gate 3 — the code deployed is `main` (never a PR/feature branch).
+# Rollback is one command — see docs/runbooks/deploy.md.
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {} # emergency / first controlled deploy (still hits the approval gate)
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false # never interrupt an in-flight prod deploy
+
+jobs:
+  deploy:
+    # Gate 1: proceed only if CI passed on main (or an explicit manual dispatch).
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    # Gate 2: the `production` environment requires manual approval (required reviewer).
+    environment:
+      name: production
+      url: https://one-balance.lemonesqeezy.workers.dev
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2 pinned by SHA
+        with:
+          persist-credentials: false
+          ref: main # Gate 3: deploy main's code only — never a PR/feature branch.
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0 pinned by SHA
+        with:
+          node-version: 22
+
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+
+      # D1 schema migrations are a DELIBERATE, separate step (see docs/runbooks/deploy.md),
+      # NOT auto-run here: there is no committed migration history yet, so auto-generating in CI
+      # is unsafe against the live DB. This ships worker code only; the prod D1 schema exists.
+      - name: Deploy worker to production
+        run: pnpm run deploy:ci
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          AUTH_KEY: ${{ secrets.AUTH_KEY }}
+          KEY_MANAGER_TOKEN: ${{ secrets.KEY_MANAGER_TOKEN }}
